@@ -1,0 +1,102 @@
+# ============================================================
+# Training site .htaccess (optimal + strict-ish)
+# - No Referer-based PHP protection (unreliable)
+# - Real protection happens in PHP via session/context checks
+# ============================================================
+
+RewriteEngine On
+Options -MultiViews
+
+# ----------------------------
+# 1) Canonical URL (HTTPS + no-www)
+# ----------------------------
+
+RewriteCond %{HTTPS} !=on
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
+RewriteRule ^ https://%1%{REQUEST_URI} [R=301,L]
+
+# ----------------------------
+# 2) Hardening
+# ----------------------------
+
+Options -Indexes
+
+# Block dotfiles except .well-known
+RewriteRule "(^|/)\.(?!well-known/)" - [F,L]
+
+# Defense-in-depth (if ever exposed)
+RewriteRule ^vendor/ - [F,L]
+RewriteRule ^composer\.(json|lock)$ - [F,L]
+
+# ----------------------------
+# 3) Deny direct access to sensitive PHP paths
+# ----------------------------
+
+# If /common is reachable under this vhost
+RewriteRule ^common/(config|includes|ajax)/.*\.php$ - [F,L]
+
+# If these exist inside training webroot
+RewriteRule ^config/.*\.php$ - [F,L]
+RewriteRule ^includes/.*\.php$ - [F,L]
+
+# NOTE:
+# We do NOT deny /ajax/*.php here.
+# Browsers must call /ajax endpoints directly.
+# Access control MUST be enforced in PHP.
+
+# ----------------------------
+# 4) Security headers (safe defaults)
+# ----------------------------
+
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+    Header set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+</IfModule>
+
+# ----------------------------
+# 5) Cache static assets aggressively
+# ----------------------------
+
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 30 days"
+    ExpiresByType application/javascript "access plus 30 days"
+    ExpiresByType image/png "access plus 90 days"
+    ExpiresByType image/jpeg "access plus 90 days"
+    ExpiresByType image/svg+xml "access plus 90 days"
+    ExpiresByType image/webp "access plus 90 days"
+    ExpiresByType font/woff2 "access plus 180 days"
+    ExpiresByType video/mp4 "access plus 30 days"
+    ExpiresByType video/webm "access plus 30 days"
+</IfModule>
+
+# ----------------------------
+# 6) Optional: hotlink protection (assets only)
+# - allow empty Referer (privacy browsers)
+# ----------------------------
+
+RewriteCond %{REQUEST_URI} \.(jpg|jpeg|png|gif|svg|webp|css|js|mp4|webm)$ [NC]
+RewriteCond %{HTTP_REFERER} !^$ [NC]
+RewriteCond %{HTTP_REFERER} !^https://(central|training)\.simulator\.run [NC]
+RewriteRule .* - [F,L]
+
+# ----------------------------
+# 7) Routing / clean URLs
+# ----------------------------
+
+# Stop hvis fil eller mappe findes
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# /foo -> /foo.php (root)
+RewriteCond %{DOCUMENT_ROOT}/$1.php -f
+RewriteRule ^([^/]+)/?$ $1.php [L]
+
+# /foo -> /pages/foo.php
+RewriteCond %{DOCUMENT_ROOT}/pages/$1.php -f
+RewriteRule ^([^/]+)/?$ pages/$1.php [L]

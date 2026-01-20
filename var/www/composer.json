@@ -1,0 +1,14 @@
+{
+  "name": "simulator/dev",
+  "type": "project",
+  "autoload": {
+    "psr-4": {
+      "Engine\\": "Engine/",
+      "Modules\\": "Modules/"
+    }
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "sort-packages": true
+  }
+}
