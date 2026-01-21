@@ -13,6 +13,8 @@ declare(strict_types=1);
  *   ];
  */
 
+if (!defined('INSTALL_ROOT')) define('INSTALL_ROOT', '/var/www/');
+
 $assets     = $view['assets']     ?? ['libs' => [], 'modules' => []];
 $pageScript = $view['pageScript'] ?? '';
 $ctxKey     = $view['ctxKey']     ?? '';
@@ -32,15 +34,37 @@ header(
     "font-src 'self' https://fonts.gstatic.com data:;"
 );
 
-// Helper: safe HTML tag emitters (no legacy deps)
+// Helper: safe HTML output
 $h = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
 
-$css = static function (string $href) use ($h): string {
+/**
+ * Cache-bust local assets by appending ?v=<filemtime>.
+ * - Only versions local absolute web paths like "/common/assets/.."
+ * - Leaves external URLs untouched.
+ */
+$asset = static function (string $webPath): string {
+    if ($webPath === '' || $webPath[0] !== '/') {
+        return $webPath; // external or empty
+    }
+
+    $disk = INSTALL_ROOT . ltrim($webPath, '/');
+    $v = @filemtime($disk);
+    if (!$v) {
+        return $webPath; // fail-safe: no version if file missing
+    }
+
+    $sep = (str_contains($webPath, '?')) ? '&' : '?';
+    return $webPath . $sep . 'v=' . $v;
+};
+
+$css = static function (string $href) use ($h, $asset): string {
+    $href = $asset($href);
     return '<link rel="stylesheet" href="' . $h($href) . '">' . "\n";
 };
 
-$js = static function (string $src, bool $defer, string $nonce) use ($h): string {
+$js = static function (string $src, bool $defer, string $nonce) use ($h, $asset): string {
     $d = $defer ? ' defer' : '';
+    $src = $asset($src);
     return '<script' . $d . ' src="' . $h($src) . '" nonce="' . $h($nonce) . '"></script>' . "\n";
 };
 
@@ -53,7 +77,7 @@ $js = static function (string $src, bool $defer, string $nonce) use ($h): string
 
     <link rel="icon" type="image/png" href="/common/assets/images/favicon.png">
 
-    <!-- Fonts -->
+    <!-- Fonts (external: do NOT version) -->
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300;0,400;0,600;0,700;0,800;1,300;1,400;1,600;1,700;1,800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300;0,400;0,600;0,700;0,800;1,300;1,400;1,600;1,700;1,800&family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css?family=Roboto+Mono" rel="stylesheet">
@@ -69,6 +93,7 @@ $js = static function (string $src, bool $defer, string $nonce) use ($h): string
 
 // Core (always)
 echo $css('/common/assets/css/simulator.css');
+echo $css('/common/assets/css/features/menubar/menubar.css');
 
 // Pace
 if (!empty($customScriptArr['instructor-paced'])) {

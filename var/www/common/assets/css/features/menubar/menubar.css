@@ -1,0 +1,132 @@
+/* /common/assets/css/features/menubar/menubar.css
+ *
+ * MenuBar (right side)
+ * - Always present (no display:none).
+ * - Collapsed by default.
+ * - Expands on hover or keyboard focus-within.
+ * - No JS width manipulation required.
+ *
+ * Requirements:
+ * - HTML skeleton:
+ *   <div id="menuBar" class="menubar"> ... </div>
+ */
+
+:root {
+	--menubar-collapsed: 40px;
+	--menubar-expanded: 250px;
+	--topbar-height: 40px;
+}
+
+/* Base container */
+.menubar {
+	position: fixed;
+	top: var(--topbar-height);
+	right: 0;
+	height: calc(100vh - var(--topbar-height));
+	width: var(--menubar-collapsed);
+	z-index: 5000;
+
+	background: #111;
+	overflow: hidden;
+
+	transition: width 160ms ease;
+}
+
+/* Expand on hover or keyboard focus */
+.menubar:hover,
+.menubar:focus-within {
+	width: var(--menubar-expanded);
+}
+
+/* Main content should reserve collapsed width only */
+#main {
+	margin-right: var(--menubar-collapsed);
+}
+
+/* If you want main to reserve expanded width on hover, do it via a class toggle.
+ * Default: keep main stable (no layout shift).
+ */
+body.menubar-open #main {
+	margin-right: var(--menubar-expanded);
+}
+
+/* Button grid */
+.grid-menu-button {
+	display: grid;
+	grid-template-columns: var(--menubar-collapsed) 1fr;
+	align-items: center;
+}
+
+/* Button hover */
+.grid-menu-button:hover {
+	background: #2f2f2f;
+	color: #fff;
+}
+
+/* Buttons */
+.menu-btn {
+	cursor: pointer;
+	margin: 5px 0;
+	color: #fff;
+	user-select: none;
+}
+
+/* Icon column */
+.button-icon-container {
+	position: relative;
+	padding: 10px;
+	width: var(--menubar-collapsed);
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+
+.menu-icons {
+	text-align: center;
+}
+
+/* Text column */
+.menu-text {
+	padding: 0 10px;
+	white-space: nowrap;
+
+	/* Hidden when collapsed */
+	opacity: 0;
+	transform: translateX(-6px);
+	transition: opacity 120ms ease, transform 120ms ease;
+}
+
+/* Show text when expanded */
+.menubar:hover .menu-text,
+.menubar:focus-within .menu-text {
+	opacity: 1;
+	transform: translateX(0);
+}
+
+/* Separators */
+.menu-separator {
+	padding: 16px 0 0 10px;
+	font-size: 90%;
+	letter-spacing: .1rem;
+	color: #b4b4b4;
+
+	/* Hide separator text when collapsed */
+	opacity: 0;
+	transition: opacity 120ms ease;
+}
+
+.menubar:hover .menu-separator,
+.menubar:focus-within .menu-separator {
+	opacity: 1;
+}
+
+/* Badge */
+.button-badge {
+	background-color: #fa3e3e;
+	border-radius: 50%;
+	width: 8px;
+	height: 8px;
+	position: absolute;
+	top: 8px;
+	right: 8px;
+}

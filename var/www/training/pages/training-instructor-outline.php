@@ -46,6 +46,7 @@ $assets = \App\Context\resolve_assets($pageContext);
 $assets['js'][] = '/common/assets/js/features/outline/outline-ui.js';
 $assets['js'][] = '/common/assets/js/features/outline/outline-status.js';
 $assets['js'][] = '/common/assets/js/polling/consumers/consumer.outline.js';
+$assets['js'][] = '/common/assets/js/features/sidebar/help-sidebar.js';
 
 $ctxKey = \App\Context\ctx_key($pageContext); // expected: training-instructor-outline
 $_SERVER['APP_PAGE_KEY'] = $ctxKey;

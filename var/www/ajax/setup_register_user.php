@@ -144,6 +144,8 @@ try {
 	// that should be handled by the login/builder flow.
 	if (isset($_SESSION['delivery_meta']) && is_array($_SESSION['delivery_meta'])) {
 		$_SESSION['delivery_meta']['team_no'] = $newTeamNo;
+		$_SESSION['delivery_meta']['language_code'] = $languageCode;
+		$_SESSION['delivery_meta']['first_name'] = $firstName;
 	}
 
 	// Optional: also keep delivery_context in sync if it exists (during transition)

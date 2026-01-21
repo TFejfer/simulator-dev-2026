@@ -54,6 +54,11 @@ if (!empty($customScriptArr['simulator'])) {
     echo $js('/common/assets/js/core/topbar/topbar-timer.js', true, $nonce);
     echo $js('/common/assets/js/core/topbar/topbar-engine.js', true, $nonce);
     echo $js('/common/assets/js/core/topbar/topbar-exercise-hooks.js', true, $nonce);
+
+    echo $js('/common/assets/js/core/menubar/menubar-render.js', true, $nonce);
+    echo $js('/common/assets/js/core/menubar/menubar-rules.js', true, $nonce);
+    echo $js('/common/assets/js/core/menubar/menubar-bind.js', true, $nonce);
+    echo $js('/common/assets/js/core/menubar/menubar-engine.js', true, $nonce);
 }
 
 // Optional: polling (only when enabled)
