@@ -45,6 +45,7 @@ function resolve_assets(array $ctx): array
 
 		// Default features for ALL training pages
 		$js[] = '/common/assets/js/features/broadcast/broadcast.js';
+		$js[] = '/common/assets/js/features/auth/access-unblock.js';
 	}
 
 	// -------------------------------------------------

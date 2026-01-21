@@ -11,20 +11,14 @@
 (() => {
 	'use strict';
 
-	const buildUiCtx = (pollCtx) => {
-		const simulator = pollCtx?.simulator || window.simulator || null;
+	const buildUiCtx = () => {
+		'use strict';
 
-		const termFn = (id, fallback = '') => {
-			if (typeof window.simulatorTerm === 'function') {
-				try {
-					const terms = simulator?.C_TERMS || window.SIM_SHARED?.common_terms || [];
-					const out = window.simulatorTerm(Number(id || 0), terms);
-					return (out !== undefined && out !== null && String(out) !== '') ? String(out) : String(fallback || '');
-				} catch {
-					return String(fallback || '');
-				}
-			}
-			return String(fallback || '');
+		const termFn = (id) => {
+			const key = String(Number(id || 0));
+			const terms = window.SIM_SHARED?.common_terms || null;
+			if (!terms || typeof terms !== 'object') return '';
+			return String(terms[key] ?? '');
 		};
 
 		return { term: termFn };
@@ -55,7 +49,7 @@
 				return;
 			}
 
-			const uiCtx = buildUiCtx(pollCtx);
+			const uiCtx = buildUiCtx();
 
 			window.PollingDebug?.log('outline.status.apply', {
 				exercises: Array.isArray(payload.exercises) ? payload.exercises.length : 0,

@@ -71,7 +71,7 @@
 			if (itemType === 'debriefing') return ctx.term(304);
 			if (itemType === 'closure') return ctx.term(305);
 			if (itemType === 'exercise') return ctx.term(237);
-			if (itemType === 'terminology') return ctx.term(562, 'Terminology');
+			if (itemType === 'terminology') return ctx.term(562);
 			return `Item ${itemType}`;
 		};
 
@@ -98,7 +98,7 @@
 
 				// Default status/lock placeholders for exercise rows (used by status engine)
 				const statusHtml = (itemType === 'exercise' && exerciseNo > 0)
-					? `<mark id="mark${exerciseNo}" class="markOutline pending">${ctx.term(0, 'pending')}</mark>`
+					? `<mark id="mark${exerciseNo}" class="markOutline pending">${ctx.term(311)}</mark>`
 					: '';
 
 				const lockHtml = (itemType === 'exercise' && exerciseNo > 0)
@@ -216,7 +216,7 @@
 			if (maxStep === 100) {
 				rec.markEl.classList.remove('pending', 'in-progress');
 				rec.markEl.classList.add('completed');
-				rec.markEl.textContent = ctx.term(395, 'completed');
+				rec.markEl.textContent = ctx.term(395);
 
 				if (rec.itemEl) rec.itemEl.classList.remove('outline-item', 'clickable', 'grow');
 				if (rec.lockCellEl) rec.lockCellEl.innerHTML = '';
@@ -226,7 +226,7 @@
 			if (maxStep >= 10) {
 				rec.markEl.classList.remove('pending', 'completed');
 				rec.markEl.classList.add('in-progress');
-				rec.markEl.textContent = ctx.term(312, 'in progress');
+				rec.markEl.textContent = ctx.term(312);
 
 				if (rec.lockEl) {
 					rec.lockEl.classList.remove('fa-lock');
@@ -237,7 +237,7 @@
 
 			rec.markEl.classList.remove('in-progress', 'completed');
 			rec.markEl.classList.add('pending');
-			rec.markEl.textContent = ctx.term(0, 'pending');
+			rec.markEl.textContent = ctx.term(311);
 		});
 
 		locks.forEach((row) => {

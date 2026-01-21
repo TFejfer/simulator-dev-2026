@@ -31,19 +31,20 @@
 		return;
 	}
 
-	// Shared/outline mapping example
-	const outlineMapping = {
-		[PollingEvents.ACCESS_UNBLOCK]: PollConsumerShared.onAccessUnblock,
+	// Shared handlers across multiple solutions
+	Polling.register('_shared', {
 		[PollingEvents.BROADCAST]: PollConsumerShared.onBroadcast,
-		[PollingEvents.EXERCISE_ACTIONS]: PollConsumerShared.onOutlineExerciseActions,
-		[PollingEvents.EXERCISE_UNLOCK]: PollConsumerOutline.onExerciseUnlock
+		[PollingEvents.ACCESS_UNBLOCK]: PollConsumerShared.onAccessUnblock
+	});
+
+	// Specific outline mapping
+	const outlineMapping = {
+		[PollingEvents.EXERCISE_UNLOCK]: PollConsumerOutline.onOutlineStatusRefresh,
+		[PollingEvents.EXERCISE]: PollConsumerOutline.onOutlineStatusRefresh
 	};
 
 	// New key
 	Polling.register('training-instructor-outline', outlineMapping);
-
-	// Optional legacy alias during transition
-	Polling.register('training-1-outline', outlineMapping);
 
 	// Placeholders for future solutions
 	Polling.register('training-problem-exercise', {

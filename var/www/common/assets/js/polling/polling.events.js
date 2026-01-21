@@ -22,7 +22,7 @@
 		EXERCISE_UNLOCK: 'log_exercise_unlock',
 
 		// Exercise log items (state machine)
-		EXERCISE_LOG: 'log_exercise',
+		EXERCISE: 'log_exercise',
 
 		// Placeholders (add as you migrate)
 		NOTIFICATIONS: 'log_notifications',

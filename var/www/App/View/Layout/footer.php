@@ -47,6 +47,13 @@ if (!empty($customScriptArr['simulator'])) {
     echo $js('/common/assets/js/core/simulator-cache.js', true, $nonce);
     echo $js('/common/assets/js/core/simulator-ajax.js', true, $nonce);
     echo $js('/common/assets/js/core/simulator-page.js', true, $nonce);
+
+    echo $js('/common/assets/js/core/topbar/page-title-resolver.js', true, $nonce);
+    echo $js('/common/assets/js/core/topbar/topbar-widgets.js', true, $nonce);
+    echo $js('/common/assets/js/core/topbar/topbar-rules.js', true, $nonce);
+    echo $js('/common/assets/js/core/topbar/topbar-timer.js', true, $nonce);
+    echo $js('/common/assets/js/core/topbar/topbar-engine.js', true, $nonce);
+    echo $js('/common/assets/js/core/topbar/topbar-exercise-hooks.js', true, $nonce);
 }
 
 // Optional: polling (only when enabled)

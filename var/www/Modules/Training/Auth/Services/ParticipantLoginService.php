@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Modules\Training\Auth\Services;
 
+use Modules\Training\Auth\Repositories\ActiveParticipantRepository;
 use Modules\Training\Auth\DTO\LoginRequest;
 use Modules\Training\Auth\DTO\LoginResult;
 use Modules\Training\Auth\Repositories\TrainingUserRepository;
@@ -30,7 +31,8 @@ final class ParticipantLoginService
         private PaceStrategyFactory $paceFactory,
         private MonitoringHookInterface $monitorHook,
         private CsrfService $csrf,
-        private SessionService $session
+        private SessionService $session,
+        private ActiveParticipantRepository $activeParticipants
     ) {}
 
     public function login(LoginRequest $req): LoginResult
@@ -95,6 +97,9 @@ final class ParticipantLoginService
         $this->csrf->rotate();
 
         $sessionToken = bin2hex(random_bytes(32));
+
+        // Reset team selection at login time (forces setup to run)
+        $this->activeParticipants->resetTeamOnLogin($accessId, $sessionToken);
 		
 		// Heartbeat #1 (immediately marks the client as online)
 		$this->heartbeat->touch($accessId, $sessionToken);

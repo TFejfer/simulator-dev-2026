@@ -13,7 +13,11 @@
 
 	window.PollConsumerShared = {
 		async onAccessUnblock(ctx, events) {
-			window.location.reload();
+			if (typeof window.handleLogAccessUnblock === 'function') {
+				return window.handleLogAccessUnblock();
+			}
+			// Fail-safe: if handler is missing, force redirect
+			window.location.href = '/login';
 		},
 
 		async onBroadcast(ctx, events) {

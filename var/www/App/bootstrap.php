@@ -178,7 +178,6 @@ $csrfService    = new \Modules\Training\Auth\Support\CsrfService();
 $sessionService = new \Modules\Training\Auth\Support\SessionService();
 
 $loginPolicyService     = new \Modules\Training\Auth\Services\LoginPolicyService();
-$loginPolicyService     = new \Modules\Training\Auth\Services\LoginPolicyService();
 $outlineRepo = new \Modules\Training\Auth\Repositories\OutlineRepository($dbSharedContent);
 $deliveryMetaBuilder = new \Modules\Training\Auth\Services\DeliveryMetaBuilder($outlineRepo);
 
@@ -206,7 +205,8 @@ $participantLoginService = new \Modules\Training\Auth\Services\ParticipantLoginS
     $paceFactory,
     $monitorHook,
     $csrfService,
-    $sessionService
+    $sessionService,
+    $trainingActiveRepo
 );
 
 $logoutService = new \Modules\Training\Auth\Services\ParticipantLogoutService(

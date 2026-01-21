@@ -28,12 +28,6 @@
 		outline: [],
 	};
 
-	const updateTopBar = (ctx) => {
-		// Example: show team number + page title
-		$('#topBarArea1').text(`Team ${Number(ctx.delivery.team || 0)}`);
-		$('#topBarArea3').text('Training outline');
-	};
-
 	SimulatorPage.run({
 		id: 'training-instructor-outline',
 
@@ -69,9 +63,17 @@
 
 		// Render: fast and synchronous
 		render: (ctx) => {
-			updateTopBar(ctx);
+			TopBarEngine.render();
 			$('#display_content').html(window.OutlineUI.renderOutlineHtml(ctx, state.outline));
-			window.OutlineUI.initStatusUI();
+			//window.OutlineUI.initStatusUI();
+
+			// IMPORTANT: Apply current DB status once after initial render.
+			// Use requestAnimationFrame so mark/lock elements exist in DOM.
+			if (window.OutlineStatus && typeof window.OutlineStatus.refresh === 'function') {
+				requestAnimationFrame(() => {
+					window.OutlineStatus.refresh({ simulator: window.simulator });
+				});
+			}
 		},
 
 		// Background: heartbeat (keep it minimal for now)

@@ -60,6 +60,26 @@ try {
 	$locks = $repo->findRecentUnlocks($accessId, 60);
 	$exercises = $repo->findExerciseProgress($deliveryId, $accessId, $teamNo);
 
+
+echo json_encode([
+	'ok' => true,
+	'data' => [
+		'_debug' => [
+			'access_id' => $accessId,
+			'team_no' => $teamNo,
+			'delivery_id_raw' => ($meta['delivery_id'] ?? null),
+			'delivery_id_cast' => $deliveryId,
+		],
+		'exercises' => [],
+		'locks' => []
+	],
+	'error' => null
+], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+exit;
+
+
+
+	/*
 	echo json_encode([
 		'ok' => true,
 		'data' => [
@@ -69,7 +89,7 @@ try {
 		'error' => null
 	], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 	exit;
-
+*/
 } catch (Throwable) {
 	http_response_code(500);
 	echo json_encode(['ok' => false, 'data' => null, 'error' => 'Server error'], JSON_UNESCAPED_UNICODE);

@@ -79,66 +79,122 @@ final class TrainingOutlineStatusRepository
 	 * Returns max_step per exercise_no for the given delivery/team/access.
 	 * Includes exercises that have no log rows (max_step=0).
 	 *
-	 * Implementation:
-	 * - Use outlines as the authoritative list of exercises (exercise_no > 0).
-	 * - LEFT JOIN aggregated runtime log_exercise on outline_id.
-	 * - Group at exercise_no level and take MAX across any outline_id rows mapping to same exercise_no.
+	 * Implementation (NO cross-db joins):
+	 * 1) Read outlines list (outline_id -> exercise_no) from SHARED_CONTENT.
+	 * 2) Read max_step per outline_id from RUNTIME.
+	 * 3) Merge in PHP:
+	 *    - For each exercise_no: take MAX(max_step) across all outline_id rows mapping to it.
 	 *
 	 * @return array<int, array{exercise_no:int, max_step:int}>
 	 */
-	public function findExerciseProgress(
-        int $deliveryId,
-        int $accessId,
-        int $teamNo
-    ): array {
-        if ($deliveryId <= 0 || $accessId <= 0 || $teamNo <= 0) return [];
+	public function findExerciseProgress(int $deliveryId, int $accessId, int $teamNo): array
+	{
+		if ($deliveryId <= 0 || $accessId <= 0 || $teamNo <= 0) return [];
 
-        try {
-            $stmt = $this->dbSharedContent->prepare("
-                SELECT
-                    o.exercise_no AS exercise_no,
-                    COALESCE(MAX(x.max_step), 0) AS max_step
-                FROM
-                    outlines o
-                LEFT JOIN (
-                    SELECT
-                        outline_id,
-                        MAX(step_no) AS max_step
-                    FROM
-                        RUNTIME.log_exercise
-                    WHERE
-                        access_id = :access_id
-                        AND team_no = :team_no
-                    GROUP BY
-                        outline_id
-                ) x
-                    ON x.outline_id = o.outline_id
-                WHERE
-                    o.delivery_id = :delivery_id
-                    AND o.item_type = 'exercise'
-                    AND o.exercise_no > 0
-                GROUP BY
-                    o.exercise_no
-                ORDER BY
-                    o.exercise_no
-            ");
+		try {
+			// -------------------------------------------------
+			// 1) Outline index (shared): outline_id -> exercise_no
+			// -------------------------------------------------
+			$stmtA = $this->dbSharedContent->prepare("
+				SELECT
+					outline_id,
+					exercise_no
+				FROM
+					outlines
+				WHERE
+					delivery_id = :delivery_id
+					AND item_type = 'exercise'
+					AND exercise_no > 0
+			");
+			$stmtA->execute([':delivery_id' => $deliveryId]);
+			$outlineRows = $stmtA->fetchAll(PDO::FETCH_ASSOC);
 
-            $stmt->execute([
-                ':delivery_id' => $deliveryId,
-                ':access_id' => $accessId,
-                ':team_no' => $teamNo,
-            ]);
+			if (!is_array($outlineRows) || $outlineRows === []) {
+				return [];
+			}
 
-            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+			// Build mapping and a stable list of exercise_nos
+			$outlineIdToExerciseNo = [];
+			$exerciseNos = [];
 
-            return array_values(array_map(static function (array $r): array {
-                return [
-                    'exercise_no' => (int)($r['exercise_no'] ?? 0),
-                    'max_step' => (int)($r['max_step'] ?? 0),
-                ];
-            }, $rows));
-        } catch (Throwable) {
-            return [];
-        }
-    }
+			foreach ($outlineRows as $r) {
+				$oid = (int)($r['outline_id'] ?? 0);
+				$ex = (int)($r['exercise_no'] ?? 0);
+				if ($oid <= 0 || $ex <= 0) continue;
+
+				$outlineIdToExerciseNo[$oid] = $ex;
+				$exerciseNos[$ex] = true;
+			}
+
+			if ($outlineIdToExerciseNo === []) {
+				return [];
+			}
+
+			// -------------------------------------------------
+			// 2) Runtime aggregate: outline_id -> max_step
+			// -------------------------------------------------
+			$stmtB = $this->dbRuntime->prepare("
+				SELECT
+					outline_id,
+					MAX(step_no) AS max_step
+				FROM
+					log_exercise
+				WHERE
+					access_id = :access_id
+					AND team_no = :team_no
+				GROUP BY
+					outline_id
+			");
+			$stmtB->execute([
+				':access_id' => $accessId,
+				':team_no' => $teamNo,
+			]);
+
+			$logRows = $stmtB->fetchAll(PDO::FETCH_ASSOC);
+
+			$outlineIdToMaxStep = [];
+			if (is_array($logRows)) {
+				foreach ($logRows as $r) {
+					$oid = (int)($r['outline_id'] ?? 0);
+					$ms = (int)($r['max_step'] ?? 0);
+					if ($oid <= 0) continue;
+					$outlineIdToMaxStep[$oid] = $ms;
+				}
+			}
+
+			// -------------------------------------------------
+			// 3) Merge: exercise_no -> max_step (max across outline_id)
+			// -------------------------------------------------
+			$exerciseNoToMaxStep = [];
+
+			// Initialize all exercises to 0 (ensures "no logs" returns max_step=0)
+			foreach (array_keys($exerciseNos) as $exNo) {
+				$exerciseNoToMaxStep[(int)$exNo] = 0;
+			}
+
+			// Apply max steps found in runtime
+			foreach ($outlineIdToExerciseNo as $oid => $exNo) {
+				$ms = $outlineIdToMaxStep[$oid] ?? 0;
+				if ($ms > ($exerciseNoToMaxStep[$exNo] ?? 0)) {
+					$exerciseNoToMaxStep[$exNo] = (int)$ms;
+				}
+			}
+
+			// Output sorted by exercise_no
+			ksort($exerciseNoToMaxStep);
+
+			$out = [];
+			foreach ($exerciseNoToMaxStep as $exNo => $ms) {
+				$out[] = [
+					'exercise_no' => (int)$exNo,
+					'max_step' => (int)$ms,
+				];
+			}
+
+			return $out;
+
+		} catch (Throwable) {
+			return [];
+		}
+	}
 }

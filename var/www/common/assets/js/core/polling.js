@@ -267,7 +267,10 @@
 		},
 
 		async _dispatch(events, traceId) {
-			const handlers = this._registry[this._solution] || {};
+			const shared = this._registry['_shared'] || {};
+			const specific = this._registry[this._solution] || {};
+			const handlers = { ...shared, ...specific }; // specific can override shared if needed
+
 			const ctx = {
 				engine: this,
 				solution: this._solution,
