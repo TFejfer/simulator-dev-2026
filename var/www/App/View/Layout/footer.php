@@ -59,6 +59,8 @@ if (!empty($customScriptArr['simulator'])) {
     echo $js('/common/assets/js/core/menubar/menubar-rules.js', true, $nonce);
     echo $js('/common/assets/js/core/menubar/menubar-bind.js', true, $nonce);
     echo $js('/common/assets/js/core/menubar/menubar-engine.js', true, $nonce);
+
+    echo $js('/common/assets/js/simulator-confirm.js', true, $nonce);
 }
 
 // Optional: polling (only when enabled)

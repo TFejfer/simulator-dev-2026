@@ -94,6 +94,7 @@ $js = static function (string $src, bool $defer, string $nonce) use ($h, $asset)
 // Core (always)
 echo $css('/common/assets/css/simulator.css');
 echo $css('/common/assets/css/features/menubar/menubar.css');
+echo $css('/common/assets/css/simulator-confirm.css');
 
 // Pace
 if (!empty($customScriptArr['instructor-paced'])) {

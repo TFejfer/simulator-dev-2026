@@ -64,21 +64,22 @@
 
 		window.PollingDebug?.log('broadcast.show', { id, created_at: msg.created_at || '' }, 'info');
 
-		// Minimal UI: alert fallback if you have no toast system on this page yet
-		// Replace this with your existing modal/toast renderer if you have one.
+		// Show broadcast message
 		if (typeof window.simulatorShowConfirm === 'function') {
 			window.simulatorShowConfirm({
-				title: 'Broadcast',
+				title: simulatorTerm(349),
 				content: text,
+				type: 'info',
 				columnClass: 'medium',
 				backgroundDismiss: true,
 				buttons: {
-					ok: { text: 'OK', btnClass: 'btn-blue' }
+					ok: { text: simulatorTerm(210), btnClass: 'btn-blue' }
 				}
 			});
 			return;
 		}
 
+		// Fallback
 		alert(text);
 	};
 })();
