@@ -8,9 +8,12 @@ use PDOException;
 
 final class BroadcastRepository
 {
-	public function __construct(
-		private PDO $dbRuntime
-	) {}
+	public function __construct(private PDO $dbRuntime)
+    {
+        // Force exceptions on DB errors (safe + consistent)
+        $this->dbRuntime->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $this->dbRuntime->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
+    }
 
 	/**
 	 * Read the latest broadcast message for an access_id
@@ -54,10 +57,17 @@ final class BroadcastRepository
 				'message' => (string)$row['message'],
 				'created_at' => (string)$row['created_at'],
 			];
+		} catch (PDOException $e) {
+            // Log the real DB error server-side (do NOT expose to client)
+            error_log(sprintf(
+                'BroadcastRepository::readLatest failed. access_id=%d. Error=%s',
+                $accessId,
+                $e->getMessage()
+            ));
 
-		} catch (PDOException) {
-			return null;
-		}
+            // Bubble up so the endpoint returns 500
+            throw $e;
+        }
 	}
 
 	/**
@@ -91,9 +101,19 @@ final class BroadcastRepository
 			$stmt->execute();
 
 			return (int)$this->dbRuntime->lastInsertId();
+			
+		} catch (PDOException $e) {
+            // Log the real DB error server-side (do NOT expose to client)
+            error_log(sprintf(
+                'BroadcastRepository::create failed. access_id=%d message=%s. Error=%s',
+                $accessId,
+				$message,
+                $e->getMessage()
+            ));
 
-		} catch (PDOException) {
+            // Bubble up so the endpoint returns 500
+            throw $e;
 			return 0;
-		}
+        }
 	}
 }

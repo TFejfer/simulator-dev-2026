@@ -200,6 +200,47 @@
 					window.location.href = 'training-instructor-problem-analysis';
 				}
 			});
+
+			/* ----------------------------
+			 * Help sidebar: Call instructor
+			 *
+			 * Purpose:
+			 * - Sends a simple "call instructor" signal.
+			 * - No parameters are sent from the client.
+			 * - Cooldown prevents spamming.
+			 * ---------------------------- */
+			$('#sideBar').off('click.callInstructor', '#btn_call_instructor');
+			$('#sideBar').on('click.callInstructor', '#btn_call_instructor', async function () {
+				const $btn = $(this);
+
+				// Ignore clicks during cooldown
+				if ($btn.hasClass('std-btn-disabled')) {
+					return;
+				}
+
+				// Disable immediately
+				$btn.removeClass('std-btn-enabled').addClass('std-btn-disabled');
+
+				try {
+					await simulatorAjaxRequest(
+						'/ajax/instructor_call_help.php',
+						'POST',
+						null
+					);
+				} catch (err) {
+					// Re-enable immediately on failure
+					$btn.removeClass('std-btn-disabled').addClass('std-btn-enabled');
+					console.error('Call instructor failed:', err);
+					return;
+				}
+
+				// Cooldown: re-enable after 5 seconds
+				setTimeout(() => {
+					$('#btn_call_instructor')
+						.removeClass('std-btn-disabled')
+						.addClass('std-btn-enabled');
+				}, 5000);
+			});
 		}
 	});
 })();

@@ -30,7 +30,6 @@ final class ActiveParticipantRepository
 			VALUES
 				(:access_id, :token, 0, NOW())
 			ON DUPLICATE KEY UPDATE
-                token = VALUES(token),
 				team_no = 0,
 				updated_ts = NOW()
 		";
@@ -56,7 +55,6 @@ final class ActiveParticipantRepository
             INSERT INTO log_active_participants (access_id, token, updated_ts)
             VALUES (:id, :t, NOW())
             ON DUPLICATE KEY UPDATE
-              token = VALUES(token),
               updated_ts = NOW()
         ");
         $stmt->execute([':id' => $accessId, ':t' => $token]);

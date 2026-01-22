@@ -115,6 +115,10 @@ $sharedTextsRepo      = new \Modules\Shared\Repositories\SharedContentTextsRepos
 $sharedContentBuilder = new \Modules\Shared\Services\SharedContent\Builders\SharedContentPayloadBuilder($sharedTextsRepo);
 $sharedContentService = new \Modules\Shared\Services\SharedContent\SharedContentService($publishedJsonService, $sharedContentBuilder);
 
+// ---------- Shared: notifications (runtime, dynamic; no publish) ----------
+//$notificationRepo = new \Modules\Shared\Repositories\NotificationRepository($dbRuntime);
+//$instructorNotificationService = new \Modules\Shared\Services\Notifications\InstructorNotificationService($notificationRepo);
+
 // ---------- 5) Problem: state resolver (reads runtime truth from log_exercise) ----------
 
 $problemStateRepo = new \Modules\Problem\Repositories\ExerciseStateResolverRepository($dbRuntime);
