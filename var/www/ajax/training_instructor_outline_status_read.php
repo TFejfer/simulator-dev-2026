@@ -36,11 +36,10 @@ try {
 
 	$accessId = (int)($meta['access_id'] ?? 0);
 	$teamNo = (int)($meta['team_no'] ?? 0);
-	$deliveryId = (int)($meta['delivery_id'] ?? 0);
 
-	if ($accessId <= 0 || $deliveryId <= 0) {
+	if ($accessId <= 0) {
 		http_response_code(422);
-		echo json_encode(['ok' => false, 'data' => null, 'error' => 'Missing access_id or delivery_id'], JSON_UNESCAPED_UNICODE);
+		echo json_encode(['ok' => false, 'data' => null, 'error' => 'Missing access_id'], JSON_UNESCAPED_UNICODE);
 		exit;
 	}
 	if ($teamNo <= 0) {
@@ -70,10 +69,10 @@ try {
 	$dbRuntime = $dbm->getConnection('runtime');
 	$dbShared = $dbm->getConnection('shared_content');
 
-	$repo = new TrainingOutlineStatusRepository($dbRuntime, $dbShared);
+	$repo = new TrainingOutlineStatusRepository($dbRuntime);
 
 	$locks = $repo->findRecentUnlocks($accessId, $windowSeconds);
-	$exercises = $repo->findExerciseProgress($deliveryId, $accessId, $teamNo);
+	$exercises = $repo->findExerciseProgress($accessId, $teamNo);
 
 	echo json_encode([
 		'ok' => true,

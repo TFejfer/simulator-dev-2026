@@ -129,6 +129,11 @@
 
 			$('#display_content').html(window.OutlineUI.renderOutlineHtml(ctx, state.outline));
 
+			// Bind outline click handler once (delegated on #display_content)
+			if (window.OutlineClick && typeof window.OutlineClick.bindOnce === 'function') {
+				window.OutlineClick.bindOnce();
+			}
+
 			// Apply current DB status once after initial render.
 			if (window.OutlineStatus && typeof window.OutlineStatus.refresh === 'function') {
 				requestAnimationFrame(() => {
@@ -180,25 +185,6 @@
 			 * ---------------------------- */
 			$('#topBar').on('click', '#topBarHome', function () {
 				window.location.href = 'training-instructor-outline';
-			});
-
-			/* ----------------------------
-			 * Outline item click (minimal)
-			 * ---------------------------- */
-			$('#display_content').on('click', '.outline-item', function () {
-				const item = String($(this).attr('data-item') || '');
-				const exercise = Number($(this).attr('data-exercise') || 0);
-
-				if (item === 'terminology') {
-					// Temporary routing (adjust later to your new routes)
-					window.location.href = 'delivery-1-2-tfu';
-					return;
-				}
-
-				if (item === 'exercise' && exercise > 0) {
-					// Safe placeholder until you implement proper skill-based routing.
-					window.location.href = 'training-instructor-problem-analysis';
-				}
 			});
 
 			/* ----------------------------

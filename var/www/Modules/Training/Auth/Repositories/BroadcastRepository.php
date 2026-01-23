@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace Modules\Training\Auth\Repositories;
 
 use PDO;
-use PDOException;
+use Throwable;
 
 final class BroadcastRepository
 {
@@ -57,16 +57,13 @@ final class BroadcastRepository
 				'message' => (string)$row['message'],
 				'created_at' => (string)$row['created_at'],
 			];
-		} catch (PDOException $e) {
+		} catch (Throwable $e) {
             // Log the real DB error server-side (do NOT expose to client)
             error_log(sprintf(
                 'BroadcastRepository::readLatest failed. access_id=%d. Error=%s',
                 $accessId,
                 $e->getMessage()
             ));
-
-            // Bubble up so the endpoint returns 500
-            throw $e;
         }
 	}
 
@@ -102,7 +99,7 @@ final class BroadcastRepository
 
 			return (int)$this->dbRuntime->lastInsertId();
 			
-		} catch (PDOException $e) {
+		} catch (Throwable $e) {
             // Log the real DB error server-side (do NOT expose to client)
             error_log(sprintf(
                 'BroadcastRepository::create failed. access_id=%d message=%s. Error=%s',
@@ -111,8 +108,6 @@ final class BroadcastRepository
                 $e->getMessage()
             ));
 
-            // Bubble up so the endpoint returns 500
-            throw $e;
 			return 0;
         }
 	}

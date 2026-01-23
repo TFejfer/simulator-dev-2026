@@ -60,10 +60,12 @@
 		const blocks = Array.from(byBlock.keys()).sort((a, b) => a - b);
 
 		const blockTitle = (blockNo) => {
-			if (blockNo === 1) return ctx.term(309);
+			if (!blocks.includes(2) && blockNo === 1) return ctx.term(309);
+
+			if (blockNo === 1) return ctx.term(307);
 			if (blockNo === 2) return ctx.term(308);
 			if (blockNo === 3) return ctx.term(310);
-			return `Block ${blockNo}`;
+			return `# ${blockNo}`;
 		};
 
 		const itemText = (itemType) => {
@@ -86,6 +88,7 @@
 
 			(byBlock.get(b) || []).forEach((row) => {
 				const itemType = String(row.item_type || '');
+				const outlineId = Number(row.outline_id || 0);
 				const exerciseNo = Number(row.exercise_no || 0);
 				const fmt = formatText(ctx, row.format_id);
 
@@ -106,7 +109,7 @@
 					: '';
 
 				html += `
-					<div class="grid-outline-item${clickableClass}" data-item="${itemType}" data-exercise="${exerciseNo}">
+					<div class="grid-outline-item${clickableClass}" data-item="${itemType}" data-exercise="${exerciseNo}" data-outline-id="${outlineId}">
 						<div class="outline-item-exercise">${title}</div>
 						<div class="outline-item-status">${statusHtml}</div>
 						<div class="outline-item-lock">${lockHtml}</div>
@@ -218,7 +221,6 @@
 				rec.markEl.classList.add('completed');
 				rec.markEl.textContent = ctx.term(395);
 
-				if (rec.itemEl) rec.itemEl.classList.remove('outline-item', 'clickable', 'grow');
 				if (rec.lockCellEl) rec.lockCellEl.innerHTML = '';
 				return;
 			}
@@ -234,10 +236,6 @@
 				}
 				return;
 			}
-
-			rec.markEl.classList.remove('in-progress', 'completed');
-			rec.markEl.classList.add('pending');
-			rec.markEl.textContent = ctx.term(311);
 		});
 
 		locks.forEach((row) => {

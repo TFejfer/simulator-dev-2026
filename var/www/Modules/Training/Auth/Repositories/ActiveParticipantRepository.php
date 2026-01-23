@@ -141,4 +141,29 @@ final class ActiveParticipantRepository
             ':tz'         => $timezone,
         ]);
     }
+
+    /**
+     * Update positions and role.
+     */
+    public function updateRolePosition(int $accessId, string $token, int $positionCount, int $roleId): void
+    {
+        if ($accessId <= 0 || $token === '' || $positionCount <= 0 || $roleId <= 0) return;
+
+        try {
+            $stmt = $this->dbRuntime->prepare("
+                UPDATE log_active_participants
+                SET position_count = :pos, role_id = :role, updated_ts = NOW()
+                WHERE access_id = :aid AND token = :tok
+                LIMIT 1
+            ");
+            $stmt->execute([
+                ':pos' => $positionCount,
+                ':role' => $roleId,
+                ':aid' => $accessId,
+                ':tok' => $token,
+            ]);
+        } catch (\PDOException) {
+            // Fail-safe
+        }
+    }
 }

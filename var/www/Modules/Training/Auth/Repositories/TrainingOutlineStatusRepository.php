@@ -12,189 +12,130 @@ use Throwable;
  * Purpose:
  * - Provide dynamic outline UI data:
  *   1) Recent unlocks (exercise_no + seconds_left)
- *   2) Progress per exercise_no (max_step), including max_step=0 for exercises with no log rows
+ *   2) Progress per exercise_no (max_step)
  *
  * Data sources:
  * - Runtime DB:
  *   - log_exercise_unlock(access_id, exercise_no, created_at)
- *   - log_exercise(access_id, team_no, outline_id, step_no, created_at, ...)
- * - Shared content DB:
- *   - outlines(outline_id, delivery_id, item_type, exercise_no, ...)
+ *   - log_exercise(access_id, team_no, exercise_no, step_no, created_at, ...)
  *
  * Output:
  * - Locks are keyed by exercise_no (UI-friendly).
  * - Exercises are keyed by exercise_no (UI-friendly).
  *
- * Notes:
- * - We intentionally keep exercise_no out of log_exercise (normalized design).
- * - Mapping outline_id -> exercise_no happens via outlines.
  */
 final class TrainingOutlineStatusRepository
 {
-	public function __construct(
-		private PDO $dbRuntime,
-		private PDO $dbSharedContent
-	) {}
+    public function __construct(private PDO $dbRuntime) {}
 
-	/**
-	 * Returns exercises unlocked within the last $windowSeconds seconds.
-	 *
-	 * @return array<int, array{exercise_no:int, seconds_left:int}>
-	 */
-	public function findRecentUnlocks(int $accessId, int $windowSeconds = 60): array
-	{
-		if ($accessId <= 0) return [];
+    /**
+     * Returns exercises unlocked within the last 60 seconds.
+     * If multiple unlocks exist for the same exercise_no in the window,
+     * the newest one wins.
+     *
+     * @return array<int, array{exercise_no:int, seconds_left:int}>
+     */
+    public function findRecentUnlocks(int $accessId, int $windowSeconds = 60): array
+    {
+        if ($accessId <= 0) return [];
 
-		try {
-			$stmt = $this->dbRuntime->prepare("
-				SELECT
-					exercise_no,
-					:window - TIMESTAMPDIFF(SECOND, created_at, NOW()) AS seconds_left
-				FROM
-					log_exercise_unlock
-				WHERE
-					access_id = :access_id
-					AND created_at > DATE_SUB(NOW(), INTERVAL :window SECOND)
-			");
-			$stmt->execute([
-				':access_id' => $accessId,
-				':window' => $windowSeconds,
-			]);
+        // Hard safety clamp
+        $windowSeconds = max(1, min(3600, $windowSeconds));
 
-			$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        try {
+            // Use TIMESTAMPDIFF only (no INTERVAL placeholders).
+            // Deduplicate per exercise_no by keeping the newest created_at in the window.
+            $stmt = $this->dbRuntime->prepare("
+                SELECT
+                    u.exercise_no,
+                    GREATEST(0, :window - TIMESTAMPDIFF(SECOND, u.created_at, NOW())) AS seconds_left
+                FROM log_exercise_unlock u
+                INNER JOIN (
+                    SELECT exercise_no, MAX(created_at) AS max_created_at
+                    FROM log_exercise_unlock
+                    WHERE access_id = :access_id
+                      AND TIMESTAMPDIFF(SECOND, created_at, NOW()) < :window
+                    GROUP BY exercise_no
+                ) x
+                  ON x.exercise_no = u.exercise_no
+                 AND x.max_created_at = u.created_at
+                WHERE u.access_id = :access_id
+                ORDER BY u.exercise_no ASC
+            ");
 
-			return array_values(array_map(static function (array $r): array {
-				return [
-					'exercise_no' => (int)($r['exercise_no'] ?? 0),
-					'seconds_left' => (int)($r['seconds_left'] ?? 0),
-				];
-			}, $rows));
-		} catch (Throwable) {
-			// Fail-safe: status must never crash the page
-			return [];
-		}
-	}
+            $stmt->execute([
+                ':access_id' => $accessId,
+                ':window'    => $windowSeconds,
+            ]);
 
-	/**
-	 * Returns max_step per exercise_no for the given delivery/team/access.
-	 * Includes exercises that have no log rows (max_step=0).
-	 *
-	 * Implementation (NO cross-db joins):
-	 * 1) Read outlines list (outline_id -> exercise_no) from SHARED_CONTENT.
-	 * 2) Read max_step per outline_id from RUNTIME.
-	 * 3) Merge in PHP:
-	 *    - For each exercise_no: take MAX(max_step) across all outline_id rows mapping to it.
-	 *
-	 * @return array<int, array{exercise_no:int, max_step:int}>
-	 */
-	public function findExerciseProgress(int $deliveryId, int $accessId, int $teamNo): array
-	{
-		if ($deliveryId <= 0 || $accessId <= 0 || $teamNo <= 0) return [];
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-		try {
-			// -------------------------------------------------
-			// 1) Outline index (shared): outline_id -> exercise_no
-			// -------------------------------------------------
-			$stmtA = $this->dbSharedContent->prepare("
-				SELECT
-					outline_id,
-					exercise_no
-				FROM
-					outlines
-				WHERE
-					delivery_id = :delivery_id
-					AND item_type = 'exercise'
-					AND exercise_no > 0
-			");
-			$stmtA->execute([':delivery_id' => $deliveryId]);
-			$outlineRows = $stmtA->fetchAll(PDO::FETCH_ASSOC);
+            $out = [];
+            foreach ($rows as $r) {
+                $out[] = [
+                    'exercise_no'  => (int)($r['exercise_no'] ?? 0),
+                    'seconds_left' => (int)($r['seconds_left'] ?? 0),
+                ];
+            }
+            return $out;
 
-			if (!is_array($outlineRows) || $outlineRows === []) {
-				return [];
-			}
+        } catch (Throwable $e) {
+            error_log(sprintf(
+                'TrainingOutlineStatusRepository::findRecentUnlocks failed. access_id=%d window=%d error=%s',
+                $accessId,
+                $windowSeconds,
+                $e->getMessage()
+            ));
+            return [];
+        }
+    }
 
-			// Build mapping and a stable list of exercise_nos
-			$outlineIdToExerciseNo = [];
-			$exerciseNos = [];
+    /**
+     * Returns max_step per exercise_no for the given access/team.
+     *
+     * @return array<int, array{exercise_no:int, max_step:int}>
+     */
+    public function findExerciseProgress(int $accessId, int $teamNo): array
+    {
+        if ($accessId <= 0 || $teamNo <= 0) return [];
 
-			foreach ($outlineRows as $r) {
-				$oid = (int)($r['outline_id'] ?? 0);
-				$ex = (int)($r['exercise_no'] ?? 0);
-				if ($oid <= 0 || $ex <= 0) continue;
+        try {
+            $stmt = $this->dbRuntime->prepare("
+                SELECT
+                    exercise_no,
+                    COALESCE(MAX(step_no), 0) AS max_step
+                FROM log_exercise
+                WHERE access_id = :access_id
+                  AND team_no   = :team_no
+				  AND exercise_no > 0
+                GROUP BY exercise_no
+                ORDER BY exercise_no ASC
+            ");
 
-				$outlineIdToExerciseNo[$oid] = $ex;
-				$exerciseNos[$ex] = true;
-			}
+            $stmt->execute([
+                ':access_id' => $accessId,
+                ':team_no'   => $teamNo,
+            ]);
 
-			if ($outlineIdToExerciseNo === []) {
-				return [];
-			}
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-			// -------------------------------------------------
-			// 2) Runtime aggregate: outline_id -> max_step
-			// -------------------------------------------------
-			$stmtB = $this->dbRuntime->prepare("
-				SELECT
-					outline_id,
-					MAX(step_no) AS max_step
-				FROM
-					log_exercise
-				WHERE
-					access_id = :access_id
-					AND team_no = :team_no
-				GROUP BY
-					outline_id
-			");
-			$stmtB->execute([
-				':access_id' => $accessId,
-				':team_no' => $teamNo,
-			]);
+            $out = [];
+            foreach ($rows as $r) {
+                $out[] = [
+                    'exercise_no' => (int)($r['exercise_no'] ?? 0),
+                    'max_step'    => (int)($r['max_step'] ?? 0),
+                ];
+            }
+            return $out;
 
-			$logRows = $stmtB->fetchAll(PDO::FETCH_ASSOC);
-
-			$outlineIdToMaxStep = [];
-			if (is_array($logRows)) {
-				foreach ($logRows as $r) {
-					$oid = (int)($r['outline_id'] ?? 0);
-					$ms = (int)($r['max_step'] ?? 0);
-					if ($oid <= 0) continue;
-					$outlineIdToMaxStep[$oid] = $ms;
-				}
-			}
-
-			// -------------------------------------------------
-			// 3) Merge: exercise_no -> max_step (max across outline_id)
-			// -------------------------------------------------
-			$exerciseNoToMaxStep = [];
-
-			// Initialize all exercises to 0 (ensures "no logs" returns max_step=0)
-			foreach (array_keys($exerciseNos) as $exNo) {
-				$exerciseNoToMaxStep[(int)$exNo] = 0;
-			}
-
-			// Apply max steps found in runtime
-			foreach ($outlineIdToExerciseNo as $oid => $exNo) {
-				$ms = $outlineIdToMaxStep[$oid] ?? 0;
-				if ($ms > ($exerciseNoToMaxStep[$exNo] ?? 0)) {
-					$exerciseNoToMaxStep[$exNo] = (int)$ms;
-				}
-			}
-
-			// Output sorted by exercise_no
-			ksort($exerciseNoToMaxStep);
-
-			$out = [];
-			foreach ($exerciseNoToMaxStep as $exNo => $ms) {
-				$out[] = [
-					'exercise_no' => (int)$exNo,
-					'max_step' => (int)$ms,
-				];
-			}
-
-			return $out;
-
-		} catch (Throwable) {
-			return [];
-		}
-	}
+        } catch (Throwable $e) {
+            error_log(sprintf(
+                'TrainingOutlineStatusRepository::findExerciseProgress failed. access_id=%d team_no=%d error=%s',
+                $accessId,
+                $teamNo,
+                $e->getMessage()
+            ));
+            return [];
+        }
+    }
 }

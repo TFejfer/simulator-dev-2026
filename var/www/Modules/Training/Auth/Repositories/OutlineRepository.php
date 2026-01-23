@@ -69,4 +69,34 @@ final class OutlineRepository
             return [];
         }
     }
+
+    /**
+     * Returns outline row by outline ID and delivery ID.
+     */
+    public function findOutlineRowById(int $outlineId, int $deliveryId): ?array
+    {
+        if ($outlineId <= 0 || $deliveryId <= 0) return null;
+
+        try {
+            $stmt = $this->dbSharedContent->prepare("
+                SELECT
+                    outline_id, delivery_id, item_type, exercise_no,
+                    skill_id, swap_id, theme_id, scenario_id, format_id
+                FROM outlines
+                WHERE outline_id = :outline_id
+                AND delivery_id = :delivery_id
+                LIMIT 1
+            ");
+            $stmt->execute([
+                ':outline_id' => $outlineId,
+                ':delivery_id' => $deliveryId,
+            ]);
+
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            return is_array($row) ? $row : null;
+
+        } catch (Throwable) {
+            return null;
+        }
+    }
 }
