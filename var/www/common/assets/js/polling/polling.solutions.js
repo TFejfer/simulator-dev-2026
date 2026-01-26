@@ -43,6 +43,12 @@
 		[PollingEvents.EXERCISE]: PollConsumerOutline.onOutlineStatusRefresh
 	};
 
+	Polling.register('training-problem-instructor-analysis', {
+		//[PollingEvents.EXERCISE]: PollConsumerProblem.onLogExercise,
+		//[PollingEvents.ACCESS_UNBLOCK]: PollConsumerShared.onAccessUnblock,
+		//[PollingEvents.BROADCAST]: PollConsumerShared.onBroadcast
+	});
+
 	// New key
 	Polling.register('training-instructor-outline', outlineMapping);
 

@@ -20,6 +20,12 @@ if (empty($uid) || !is_array($meta) || empty($_SESSION['session_token'])) {
 	exit;
 }
 
+// Outline page does not use exercise_meta. Prevent stale meta from leaking.
+unset($_SESSION['exercise_meta']);
+
+// Release session lock early (outline page is mostly read-only)
+session_write_close();
+
 // Debug helper (?debug=1)
 require_once INSTALL_ROOT . 'Engine/Support/Debug.php';
 \Engine\Support\Debug::enableIfRequested();

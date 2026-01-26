@@ -13,6 +13,44 @@ final class ExerciseRuntimeRepository
 	) {}
 
 	/**
+	 * Latest log_exercise row for a given access_id and team_no.
+	 *
+	 * @return array<string,mixed>|null
+	 */
+	public function findLatestRow(int $accessId, int $teamNo): ?array
+	{
+		if ($accessId <= 0 || $teamNo <= 0) return null;
+
+		$stmt = $this->dbRuntime->prepare("
+			SELECT
+				id,
+				created_at,
+				access_id,
+				team_no,
+				outline_id,
+				exercise_no,
+				theme_id,
+				scenario_id,
+				format_id,
+				step_no,
+				current_state
+			FROM log_exercise
+			WHERE access_id = :access_id
+			AND team_no   = :team_no
+			ORDER BY id DESC
+			LIMIT 1
+		");
+
+		$stmt->execute([
+			':access_id' => $accessId,
+			':team_no'   => $teamNo,
+		]);
+
+		$row = $stmt->fetch(PDO::FETCH_ASSOC);
+		return $row ?: null;
+	}
+
+	/**
 	 * Latest log_exercise row for a given outline_id in this access/team scope.
 	 *
 	 * @return array<string,mixed>|null

@@ -371,7 +371,7 @@
 			};
 
 			registerUser(ctx, formData).catch(() => {});
-			window.location.href = 'delivery-1-outline';
+			window.location.href = 'training-instructor-setup';
 		});
 
 		// Language change (rerender to update translated UI labels)

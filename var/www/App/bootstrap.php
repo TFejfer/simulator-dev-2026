@@ -175,6 +175,15 @@ $trainingAccessRepo  = new \Modules\Training\Auth\Repositories\AccessRepository(
 $trainingAttemptRepo = new \Modules\Training\Auth\Repositories\LoginAttemptRepository($dbRuntime);
 $trainingActiveRepo  = new \Modules\Training\Auth\Repositories\ActiveParticipantRepository($dbRuntime);
 
+// ---------- 10) Training: Exercise meta (runtime cache + DB truth) ----------
+
+$exerciseRuntimeRepo = new \Modules\Training\Auth\Repositories\ExerciseRuntimeRepository($dbRuntime);
+
+$exerciseMetaService = new \Modules\Training\Auth\Services\ExerciseMetaService(
+    $exerciseRuntimeRepo,
+    $trainingActiveRepo
+);
+
 // League repo is a stub until league tables are wired
 $leagueRepo = new \Modules\Training\Auth\Repositories\LeagueRepository($dbRuntime);
 
@@ -225,6 +234,7 @@ $logoutService = new \Modules\Training\Auth\Services\ParticipantLogoutService(
  * - $problemExerciseStateService
  * - $participantLoginService
  * - $logoutService
+ * - $exerciseMetaService
  * - $csrfService (optional for endpoints that render HTML forms)
  *
  * Endpoints should:

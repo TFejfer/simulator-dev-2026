@@ -143,6 +143,36 @@ final class ActiveParticipantRepository
     }
 
     /**
+     * @return array{role_id:int, position_count:int}|null
+     */
+    public function findRoleAndPosition(int $accessId, string $token): ?array
+    {
+        if ($accessId <= 0 || $token === '') return null;
+
+        $stmt = $this->dbRuntime->prepare("
+            SELECT role_id, position_count
+            FROM log_active_participants
+            WHERE access_id = :access_id
+              AND token     = :token
+            LIMIT 1
+        ");
+
+        $stmt->execute([
+            ':access_id' => $accessId,
+            ':token'     => $token,
+        ]);
+
+        /** @var array<string,mixed>|false $row */
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return null;
+
+        return [
+            'role_id' => (int)$row['role_id'],
+            'position_count' => (int)$row['position_count'],
+        ];
+    }
+
+    /**
      * Update positions and role.
      */
     public function updateRolePosition(int $accessId, string $token, int $positionCount, int $roleId): void
