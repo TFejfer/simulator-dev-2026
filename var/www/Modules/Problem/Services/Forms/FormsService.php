@@ -17,6 +17,7 @@ use Modules\Problem\Repositories\Forms\ActionsRepository;
 use Modules\Problem\Repositories\Forms\IterationRepository;
 use Modules\Problem\Repositories\Forms\DescriptionRepository;
 use Modules\Problem\Repositories\Forms\ReflectionRepository;
+use Modules\Problem\Repositories\WorkflowLogRepository;
 
 final class FormsService
 {
@@ -31,6 +32,7 @@ final class FormsService
         private DescriptionRepository $description,
         private ReflectionRepository $reflection,
         private FormsPayloadBuilder $payloadBuilder,
+        private WorkflowLogRepository $workflow,
     ) {}
 
     /**
@@ -141,6 +143,23 @@ final class FormsService
                         (string)($p['clarify_text'] ?? ''),
                         $req->actorToken
                     );
+
+                    // Workflow logging
+                    $this->workflow->insert([
+                        'access_id' => $req->accessId,
+                        'team_no' => $req->teamNo,
+                        'outline_id' => $req->outlineId,
+                        'exercise_no' => $req->exerciseNo,
+                        'theme_id' => $themeId ?: null,
+                        'scenario_id' => $scenarioId ?: null,
+                        'step_no' => 1,
+                        'crud' => 1,
+                        'deviation_id' => (int)($p['deviation_id'] ?? 0),
+                        'function_id' => (int)($p['function_id'] ?? 0),
+                        'info' => 'symptom',
+                        'actor_token' => $req->actorToken
+                    ]);
+
                     return;
                 }
                 if ($req->crud === 'update') {
@@ -153,18 +172,60 @@ final class FormsService
                     return;
                 }
                 if ($req->crud === 'delete') {
+                    $id = (int)($p['id'] ?? 0);
+	                $row = $this->symptoms->findById($req->accessId, $req->teamNo, $req->outlineId, $req->exerciseNo, $id);
+
                     $this->symptoms->delete(
                         $req->accessId, $req->teamNo, $req->outlineId, $req->exerciseNo,
                         (int)($p['id'] ?? 0)
                     );
+
+                    // Workflow logging
+                    if ($row) {
+                        $this->workflow->insert([
+                            'access_id' => $req->accessId,
+                            'team_no' => $req->teamNo,
+                            'outline_id' => $req->outlineId,
+                            'exercise_no' => $req->exerciseNo,
+                            'theme_id' => $themeId ?: null,
+                            'scenario_id' => $scenarioId ?: null,
+                            'step_no' => 1,
+                            'crud' => 4,
+                            'deviation_id' => (int)($row['deviation_id'] ?? 0),
+                            'function_id' => (int)($row['function_id'] ?? 0),
+                            'actor_token' => $req->actorToken
+                        ]);
+                    }
+
                     return;
                 }
                 if ($req->crud === 'priority') {
+                    $id = (int)($p['id'] ?? 0);
+	                $row = $this->symptoms->findById($req->accessId, $req->teamNo, $req->outlineId, $req->exerciseNo, $id);
+
                     $this->symptoms->setPriority(
                         $req->accessId, $req->teamNo, $req->outlineId, $req->exerciseNo,
                         (int)($p['id'] ?? 0),
                         $req->actorToken
                     );
+
+                    // Workflow logging
+                    if ($row) {
+                        $this->workflow->insert([
+                            'access_id' => $req->accessId,
+                            'team_no' => $req->teamNo,
+                            'outline_id' => $req->outlineId,
+                            'exercise_no' => $req->exerciseNo,
+                            'theme_id' => $themeId ?: null,
+                            'scenario_id' => $scenarioId ?: null,
+                            'step_no' => 1,
+                            'crud' => 9,
+                            'deviation_id' => (int)($row['deviation_id'] ?? 0),
+                            'function_id' => (int)($row['function_id'] ?? 0),
+                            'info' => 'priority',
+                            'actor_token' => $req->actorToken
+                        ]);
+                    }
                     return;
                 }
                 break;
@@ -179,6 +240,24 @@ final class FormsService
                         (string)($p['text'] ?? ''),
                         $req->actorToken
                     );
+
+                    // Workflow logging
+                    $keyMeta = (string)($p['key_meta'] ?? '');
+                    if (!in_array($keyMeta, ['other_ok', 'other_not'], true)) {
+                        $this->workflow->insert([
+                            'access_id' => $req->accessId,
+                            'team_no' => $req->teamNo,
+                            'outline_id' => $req->outlineId,
+                            'exercise_no' => $req->exerciseNo,
+                            'theme_id' => $themeId ?: null,
+                            'scenario_id' => $scenarioId ?: null,
+                            'step_no' => 2,
+                            'crud' => 1,
+                            'info' => $keyMeta,
+                            'actor_token' => $req->actorToken
+                        ]);
+                    }
+
                     return;
                 }
                 if ($req->crud === 'update') {
@@ -201,34 +280,66 @@ final class FormsService
 
             case 'causes':
                 if ($req->crud === 'create') {
+                    $ciId = (string)($p['ci_id'] ?? '');
+                    $deviationText = (string)($p['deviation_text'] ?? '');
+
+                    // Create row (get id so we can log info like legacy did)
                     $listNo = $this->causes->nextListNo($req->accessId, $req->teamNo, $req->outlineId, $req->exerciseNo);
-                    $this->causes->create(
-                        $req->accessId, $req->teamNo, $req->outlineId, $req->exerciseNo,
-                        $themeId ?: null, $scenarioId ?: null,
-                        (string)($p['ci_id'] ?? ''),
-                        (string)($p['deviation_text'] ?? ''),
+
+                    $newId = $this->causes->create(
+                        $req->accessId,
+                        $req->teamNo,
+                        $req->outlineId,
+                        $req->exerciseNo,
+                        $themeId ?: null,
+                        $scenarioId ?: null,
+                        $ciId,
+                        $deviationText,
                         $listNo,
                         $req->actorToken
                     );
-                    return;
-                }
-                if ($req->crud === 'update') {
-                    $this->causes->update(
-                        $req->accessId, $req->teamNo, $req->outlineId, $req->exerciseNo,
-                        (int)($p['id'] ?? 0),
-                        (string)($p['likelihood_text'] ?? ''),
-                        (string)($p['evidence_text'] ?? ''),
-                        (int)($p['proven'] ?? 0),
-                        (int)($p['disproven'] ?? 0),
-                        $req->actorToken
-                    );
+
+                    // Workflow (legacy: insert cause logged with info = new id)
+                    $this->workflow->insert([
+                        'access_id' => $req->accessId,
+                        'team_no' => $req->teamNo,
+                        'outline_id' => $req->outlineId,
+                        'exercise_no' => $req->exerciseNo,
+                        'theme_id' => $themeId ?: null,
+                        'scenario_id' => $scenarioId ?: null,
+                        'step_no' => 3,
+                        'crud' => 1,
+                        'ci_id' => $ciId !== '' ? $ciId : null,
+                        'info' => (string)$newId,
+                        'actor_token' => $req->actorToken
+                    ]);
+
                     return;
                 }
                 if ($req->crud === 'delete') {
-                    $this->causes->delete(
-                        $req->accessId, $req->teamNo, $req->outlineId, $req->exerciseNo,
-                        (int)($p['id'] ?? 0)
-                    );
+                    $id = (int)($p['id'] ?? 0);
+                    if ($id <= 0) return;
+
+                    // Load row before delete so we can log ci_id like legacy did
+                    $row = $this->causes->findById($req->accessId, $req->teamNo, $req->outlineId, $req->exerciseNo, $id);
+
+                    $this->causes->delete($req->accessId, $req->teamNo, $req->outlineId, $req->exerciseNo, $id);
+
+                    // Workflow (legacy: delete cause logged with info = deleted id)
+                    $this->workflow->insert([
+                        'access_id' => $req->accessId,
+                        'team_no' => $req->teamNo,
+                        'outline_id' => $req->outlineId,
+                        'exercise_no' => $req->exerciseNo,
+                        'theme_id' => $themeId ?: null,
+                        'scenario_id' => $scenarioId ?: null,
+                        'step_no' => 3,
+                        'crud' => 4,
+                        'ci_id' => $row ? ((string)($row['ci_id'] ?? '') ?: null) : null,
+                        'info' => (string)$id,
+                        'actor_token' => $req->actorToken
+                    ]);
+
                     return;
                 }
                 if ($req->crud === 'arrange') {
@@ -246,14 +357,39 @@ final class FormsService
 
             case 'actions':
                 if ($req->crud === 'create') {
-                    $this->actions->create(
-                        $req->accessId, $req->teamNo, $req->outlineId, $req->exerciseNo,
-                        $themeId ?: null, $scenarioId ?: null,
-                        (string)($p['ci_id'] ?? ''),
-                        (int)($p['action_id'] ?? 0),
-                        (string)($p['effect_text'] ?? ''),
+                    $ciId = (string)($p['ci_id'] ?? '');
+                    $actionId = (int)($p['action_id'] ?? 0);
+                    $effectText = (string)($p['effect_text'] ?? '');
+
+                    $newId = $this->actions->create(
+                        $req->accessId,
+                        $req->teamNo,
+                        $req->outlineId,
+                        $req->exerciseNo,
+                        $themeId ?: null,
+                        $scenarioId ?: null,
+                        $ciId,
+                        $actionId,
+                        $effectText,
                         $req->actorToken
                     );
+
+                    // Workflow (legacy: insert action logged with ciID + actionID + info=actionID)
+                    $this->workflow->insert([
+                        'access_id' => $req->accessId,
+                        'team_no' => $req->teamNo,
+                        'outline_id' => $req->outlineId,
+                        'exercise_no' => $req->exerciseNo,
+                        'theme_id' => $themeId ?: null,
+                        'scenario_id' => $scenarioId ?: null,
+                        'step_no' => 4,
+                        'crud' => 1,
+                        'ci_id' => $ciId !== '' ? $ciId : null,
+                        'action_id' => $actionId > 0 ? $actionId : null,
+                        'info' => $actionId > 0 ? (string)$actionId : null,
+                        'actor_token' => $req->actorToken
+                    ]);
+
                     return;
                 }
                 if ($req->crud === 'update') {
@@ -266,10 +402,29 @@ final class FormsService
                     return;
                 }
                 if ($req->crud === 'delete') {
-                    $this->actions->delete(
-                        $req->accessId, $req->teamNo, $req->outlineId, $req->exerciseNo,
-                        (int)($p['id'] ?? 0)
-                    );
+                    $id = (int)($p['id'] ?? 0);
+                    if ($id <= 0) return;
+
+                    // Load row before delete so we can log ci_id/action_id like legacy did
+                    $row = $this->actions->findById($req->accessId, $req->teamNo, $req->outlineId, $req->exerciseNo, $id);
+
+                    $this->actions->delete($req->accessId, $req->teamNo, $req->outlineId, $req->exerciseNo, $id);
+
+                    // Workflow (legacy: delete action logged with ciID + actionID)
+                    $this->workflow->insert([
+                        'access_id' => $req->accessId,
+                        'team_no' => $req->teamNo,
+                        'outline_id' => $req->outlineId,
+                        'exercise_no' => $req->exerciseNo,
+                        'theme_id' => $themeId ?: null,
+                        'scenario_id' => $scenarioId ?: null,
+                        'step_no' => 4,
+                        'crud' => 4,
+                        'ci_id' => $row ? ((string)($row['ci_id'] ?? '') ?: null) : null,
+                        'action_id' => $row ? ((int)($row['action_id'] ?? 0) ?: null) : null,
+                        'actor_token' => $req->actorToken
+                    ]);
+
                     return;
                 }
                 break;

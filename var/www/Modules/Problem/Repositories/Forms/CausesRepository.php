@@ -169,4 +169,30 @@ final class CausesRepository
             $listNo++;
         }
     }
+
+    // Function used for team workflow
+    public function findById(
+        int $accessId, int $teamNo, int $outlineId, int $exerciseNo,
+        int $id
+    ): ?array {
+        $stmt = $this->db->prepare("
+            SELECT id, ci_id
+            FROM problem_form_causes
+            WHERE access_id = :access_id
+            AND team_no = :team_no
+            AND outline_id = :outline_id
+            AND exercise_no = :exercise_no
+            AND id = :id
+            LIMIT 1
+        ");
+        $stmt->execute([
+            ':access_id' => $accessId,
+            ':team_no' => $teamNo,
+            ':outline_id' => $outlineId,
+            ':exercise_no' => $exerciseNo,
+            ':id' => $id,
+        ]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
 }

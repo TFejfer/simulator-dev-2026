@@ -32,6 +32,8 @@ final class FormsServiceFactory
 		$description = new DescriptionRepository($dbRuntime);
 		$reflection = new ReflectionRepository($dbRuntime);
 
+		$workflow = new \Modules\Problem\Repositories\WorkflowLogRepository($dbRuntime);
+
 		$payloadBuilder = new FormsPayloadBuilder(
 			$symptoms,
 			$facts,
@@ -52,7 +54,8 @@ final class FormsServiceFactory
 			$iteration,
 			$description,
 			$reflection,
-			$payloadBuilder
+			$payloadBuilder,
+			$workflow
 		);
 	}
 }
