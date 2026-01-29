@@ -28,6 +28,7 @@ final class ExerciseRuntimeRepository
 				access_id,
 				team_no,
 				outline_id,
+				skill_id,
 				exercise_no,
 				theme_id,
 				scenario_id,
@@ -64,6 +65,7 @@ final class ExerciseRuntimeRepository
 				SELECT
 					id,
 					outline_id,
+					skill_id
 					exercise_no,
 					theme_id,
 					scenario_id,
@@ -182,14 +184,15 @@ final class ExerciseRuntimeRepository
 		try {
 			$stmt = $this->dbRuntime->prepare("
 				INSERT INTO log_exercise
-					(access_id, team_no, outline_id, exercise_no, theme_id, scenario_id, format_id, step_no, current_state, next_state, actor_token, actor_name, include_in_poll)
+					(access_id, team_no, outline_id, skill_id, exercise_no, theme_id, scenario_id, format_id, step_no, current_state, next_state, actor_token, actor_name, include_in_poll)
 				VALUES
-					(:access_id, :team_no, :outline_id, :exercise_no, :theme_id, :scenario_id, :format_id, :step_no, :current_state, :next_state, :actor_token, :actor_name, 1)
+					(:access_id, :team_no, :outline_id, :skill_id, :exercise_no, :theme_id, :scenario_id, :format_id, :step_no, :current_state, :next_state, :actor_token, :actor_name, 1)
 			");
 			$stmt->execute([
 				':access_id' => (int)$row['access_id'],
 				':team_no' => (int)$row['team_no'],
 				':outline_id' => (int)$row['outline_id'],
+				':skill_id' => (int)$row['skill_id'],
 				':exercise_no' => (int)$row['exercise_no'],
 				':theme_id' => (int)$row['theme_id'],
 				':scenario_id' => (int)$row['scenario_id'],

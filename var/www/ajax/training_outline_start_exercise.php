@@ -142,6 +142,7 @@ try {
 		'access_id' => $accessId,
 		'team_no' => $teamNo,
 		'outline_id' => $outlineId,
+		'skill_id' => $skillId,
 		'exercise_no' => (int)($outlineRow['exercise_no'] ?? 0),
 		'theme_id' => (int)($outlineRow['theme_id'] ?? 0),
 		'scenario_id' => (int)($outlineRow['scenario_id'] ?? 0),

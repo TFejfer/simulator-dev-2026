@@ -49,7 +49,7 @@
     };
 
     const initializeSimulator = () => {
-        const ok = simulatorDataCheck(DELIVERY.accessID, DELIVERY.languageCode);
+        const ok = simulatorDataCheck(DELIVERY.access_id, DELIVERY.language_code);
         if (!ok) {
             window.location.href = 'delivery-1-outline';
             return false;

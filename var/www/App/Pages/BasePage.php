@@ -180,7 +180,9 @@ abstract class BasePage implements PageInterface
 			' . $this->renderSlot('top') . '
 			' . $this->renderSlot('chrome') . '
 			' . $this->renderSlot('overlays') . '
-			<div id="main"></div>
+			<div id="main">
+				<div id="display_content"></div>
+			</div>
 		';
 	}
 

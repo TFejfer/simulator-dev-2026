@@ -1,0 +1,59 @@
+/* forms-controller.js
+ *
+ * Central controller for all problem form CRUD operations.
+ */
+
+/* global simulatorAjaxRequest */
+
+(() => {
+	'use strict';
+
+	const applyResponseToStore = (formKey, res, store) => {
+		if (!res?.ok || !res?.data) return;
+
+		// Expected response shapes:
+		// A) { ok:true, data:{ form_key, version, data:{symptoms:[...] } } }
+		// B) { ok:true, data:{ version, symptoms:[...] } }  (fallback)
+		const data = res.data;
+
+		// Version
+		if (typeof data.version !== 'undefined') {
+			if (typeof store.setVersion === 'function') {
+				store.setVersion(formKey, data.version);
+			} else {
+				store.get().case.versions = store.get().case.versions || {};
+				store.get().case.versions[formKey] = parseInt(data.version, 10) || 0;
+			}
+		}
+
+		// Canonical form data
+		// Prefer nested "data" block if present.
+		const payload = data.data ?? data;
+
+		if (formKey === 'symptoms' && Array.isArray(payload.symptoms)) {
+			store.get().case.symptoms = payload.symptoms;
+		}
+		if (formKey === 'facts' && Array.isArray(payload.facts)) {
+			store.get().case.facts = payload.facts;
+		}
+		// Add other forms later as you migrate them.
+	};
+
+	const writeForm = async (formKey, crud, payload, store, scope) => {
+		const res = await simulatorAjaxRequest(
+			`/ajax/problem/forms/${formKey}.php`,
+			'POST',
+			{
+				crud,
+				payload,
+				expected_version: store.get().case?.versions?.[formKey] ?? 0,
+				...scope
+			}
+		);
+
+		applyResponseToStore(formKey, res, store);
+		return res;
+	};
+
+	window.ProblemFormsController = { writeForm };
+})();

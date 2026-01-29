@@ -174,8 +174,8 @@
 		);
 
 		// Pre-fill setup form (DB truth has already been applied in blocking init)
-		$("select[name='setupLanguageCode']").val(pageData.delivery.languageCode);
-		$('#setupFirstName').text(pageData.delivery.firstName);
+		$("select[name='setupLanguageCode']").val(pageData.delivery.language_code || 'en');
+		$('#setupFirstName').text(pageData.delivery.first_name || '');
 
 		// If there is an outstanding request, preload that; otherwise preload current team
 		const joinVal = Number(pageData.delivery.joinTeam || 0) > 0
@@ -203,8 +203,8 @@
 	const applySetupStatusToPageData = (st) => {
 		if (!st || typeof st !== 'object') return;
 
-		if (st.language_code) pageData.delivery.languageCode = st.language_code;
-		if (st.first_name) pageData.delivery.firstName = st.first_name;
+		if (st.language_code) pageData.delivery.language_code = st.language_code;
+		if (st.first_name) pageData.delivery.first_name = st.first_name;
 
 		if (Number.isFinite(Number(st.team_no))) pageData.delivery.team = Number(st.team_no);
 
@@ -365,8 +365,8 @@
 		// Cancel (request "no team change" and go on)
 		$(document).on('click', '#setupButtonCancel', function () {
 			const formData = {
-				setupLanguageCode: pageData.delivery.languageCode,
-				setupFirstName: pageData.delivery.firstName,
+				setupLanguageCode: pageData.delivery.language_code,
+				setupFirstName: pageData.delivery.first_name,
 				setupJoinTeam: 0
 			};
 

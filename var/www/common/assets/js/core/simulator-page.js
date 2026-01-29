@@ -45,8 +45,12 @@
 			simulatorConvertStringPropertiesToIntegers(delivery);
 		} catch {}
 
-		delivery.languageCode = delivery.languageCode || delivery.language_code || 'en';
-		delivery.firstName = delivery.firstName || delivery.first_name || '';
+		delivery.language_code = delivery.language_code || delivery.languageCode || 'en';
+		delivery.first_name = delivery.first_name || delivery.firstName || '';
+
+		// Remove camelCase aliases to keep DELIVERY(_META) snake_case only
+		if ('languageCode' in delivery) delete delivery.languageCode;
+		if ('firstName' in delivery) delete delivery.firstName;
 
 		return delivery;
 	};
@@ -204,7 +208,7 @@
 			ensureSpinner();
 
 			// Always blocking: common terms
-			await ensureCommonTerms(ctx.delivery.languageCode, debug ? dlog : null);
+			await ensureCommonTerms(ctx.delivery.language_code, debug ? dlog : null);
 
 			// Optional blocking guard: ensure a team is selected
 			if (ctx.features.requires_team) {

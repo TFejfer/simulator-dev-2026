@@ -98,7 +98,6 @@ try {
 		teamNo: $teamNo,
 		actorToken: $actorToken,
 		lastPollId: $lastPollId,
-		windowSeconds: 120,
 		maxRows: 20,
 		fallbackLookbackRows: 200
 	);

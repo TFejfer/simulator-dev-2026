@@ -96,6 +96,17 @@ $_SERVER['APP_PAGE_KEY'] = $ctxKey;
 
 $pageScript = "/common/assets/js/pages/{$ctxKey}.js";
 
+// Page specific js script
+// Forms - core
+$assets['js'][] = '/common/assets/js/features/problem/forms/store.js';
+$assets['js'][] = '/common/assets/js/features/problem/forms/forms-controller.js';
+// Forms - orchestration
+$assets['js'][] = '/common/assets/js/features/problem/forms/forms-registry.js';
+$assets['js'][] = '/common/assets/js/features/problem/forms/forms-layout.js';
+// Forms - concrete
+$assets['js'][] = '/common/assets/js/features/problem/forms/symptoms.js';
+$assets['js'][] = '/common/assets/js/features/problem/forms/facts.js';
+
 // ------------------------------------------------------------
 // 7) Page class
 // ------------------------------------------------------------
@@ -126,14 +137,16 @@ echo json_encode([
 	'CTX_KEY'	=> $ctxKey,
 	'DATA'		=> array_merge($pageObj->getPageData(), [
 		// Expose both for debugging / transparency
-		'DELIVERY_META' => $deliveryMeta,
+		'DELIVERY_META' => [
+			'team_no'	=> $deliveryMeta['team_no'] ?? 0,
+			'language_code' => $deliveryMeta['language_code'] ?? 'en',
+		],
 		'EXERCISE_META' => $exerciseMeta->toArray(),
 
 		// Optional: minimal session debug (do NOT expose secrets)
 		'SESSION_DEBUG' => [
 			'user_id'	=> $uid,
 			'access_id'	=> $accessId,
-			'team_no'	=> $teamNo,
 			'token'		=> ($sessionToken !== '') ? 'set' : 'missing',
 		],
 	]),

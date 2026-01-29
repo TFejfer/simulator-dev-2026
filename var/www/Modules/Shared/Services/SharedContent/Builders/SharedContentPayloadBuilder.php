@@ -35,6 +35,7 @@ final class SharedContentPayloadBuilder implements PayloadBuilderInterface
             'bucket' => 'shared_content',
             'language_code' => $lang,
 
+            // COMMON CONTENT
             'common_terms' => $this->repo->rowsToMap(
                 $this->repo->readCommonTerminologyRows($lang)
             ),
@@ -54,6 +55,46 @@ final class SharedContentPayloadBuilder implements PayloadBuilderInterface
             'faq_answers' => $this->repo->rowsToMap(
                 $this->repo->readFaqAnswerRows($lang)
             ),
+
+            // PROBLEM SKILL CONTENT
+            'troubleshooting_methods' => $this->repo->rowsToMap(
+                $this->repo->readTroubleshootingMethodRows($lang)
+            ),
+            'problem_terms' => $this->repo->rowsToMap(
+                $this->repo->readProblemTermsRows($lang)
+            ),
+            'deviations' => $this->repo->rowsToMap(
+                $this->repo->readDeviationsRows($lang)
+            ),
+            'deviation_explanation' => $this->repo->rowsToMap(
+                $this->repo->readDeviationExplainationRows($lang)
+            ),
+            
+            'functions' => $this->repo->readFunctionsRows($lang),
+            'normality' => $this->repo->rowsToMap(
+                $this->repo->readNormalityRows($lang)
+            ),
+            'cause_deviations' => $this->repo->rowsToMap(
+                $this->repo->readCauseDeviationRows($lang)
+            ),
+            'introduction_terms' => $this->repo->readIntroductionTermsRows($lang),
+            'kt_terms' => $this->repo->rowsToMap(
+                $this->repo->readKtTermsRows($lang)
+            ),
+
+            // RISK SKILL CONTENT
+            'risk_terms' => $this->repo->rowsToMap(
+                $this->repo->readRiskTermsRows($lang)
+            ),
+            'avoid_methods' => $this->repo->rowsToMap(
+                $this->repo->readAvoidMethodRows($lang)
+            ),
+
+            // RCA SKILL CONTENT
+            'rca_terms' => $this->repo->rowsToMap(
+                $this->repo->readRcaTermsRows($lang)
+            ),
+
         ];
     }
 }

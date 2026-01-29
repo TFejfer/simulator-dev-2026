@@ -57,6 +57,12 @@ function resolve_assets(array $ctx): array
 		$modules['instructor-paced'] = true;
 	}
 
+	if (($ctx['skill'] ?? null) === 'problem') {
+		// Keep false by default.
+		// Only enable if a page explicitly needs legacy instructor-paced.js
+		$modules['problem-forms'] = true;
+	}
+
 	return [
 		'libs'    => $libs,
 		'modules' => $modules,

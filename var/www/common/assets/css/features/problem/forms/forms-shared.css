@@ -1,0 +1,39 @@
+/* =========================== */
+/* ========== FORM ========== */
+/* =========================== */
+
+.form-step-header {
+	font-size: 1.1em;
+	letter-spacing: 0.1em;
+	color: #000;
+	text-transform: uppercase;
+	margin: 2em 0 1em 0;
+}
+
+.form-container {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	grid-auto-rows: minmax(0, auto);
+}
+
+.form-container > div {
+	background: var(--main-background-box);
+	border-radius: var(--main-border-radius-canvas-box);
+}
+
+.form-container { padding-bottom: 60px; }
+
+/* =========================== */
+/* ========== MODAL ========== */
+/* =========================== */
+
+.grid-buttons-modal {
+	display: grid;
+	grid-template-columns: 1fr minmax(30px, auto) minmax(0, auto);
+}
+
+.grid-buttons-modal > div:nth-child(2) {
+	display: grid;
+	justify-items: center;
+	align-items: center;	
+}

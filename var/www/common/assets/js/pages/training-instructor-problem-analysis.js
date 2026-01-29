@@ -1,29 +1,29 @@
-/* /var/www/common/assets/js/pages/training-problem-instructor-analysis.js
+/* /var/www/common/assets/js/pages/training-instructor-problem-analysis.js
  *
- * Problem instructor analysis (blueprint).
+ * Problem instructor analysis (minimal bring-up).
  *
- * Goals:
- * - shared_content is loaded by SimulatorPage BEFORE this script runs (blocking, required for UI/terms).
- * - exercise_static and exercise_state are fetched here and cached via ETag/304.
- * - UI features (TopBar/MenuBar/InfoSources/Forms) render from cached payloads when available.
- * - Polling consumer can call window.ProblemPageRefreshState() to refresh state when needed.
+ * Purpose:
+ * - Prove page lifecycle works (blocking/render/bind)
+ * - Show a visible placeholder in #problem_forms
+ * - Load runtime state from /ajax/problem/exercise/state.php (optional for now)
+ * - Prepare the ground for ProblemFormsLayout + ProblemFormsRegistry
+ *
+ * Notes:
+ * - Uses SimulatorPage.run({ blocking, render, bind }) (hook-object signature).
+ * - Does NOT require forms to be loaded globally; only this page needs them.
  */
 
-/* global $, SimulatorPage, simulatorAjaxRequest, simulatorCache */
+/* global $, SimulatorPage, simulatorAjaxRequest */
 
 (() => {
 	'use strict';
 
-	// ------------------------------------------------------------
-	// 0) Guardrails (fail fast with clear console errors)
-	// ------------------------------------------------------------
 	console.log('[analysis] page script loaded');
 
 	if (!document.getElementById('page-data')) {
 		console.error('[analysis] missing #page-data script tag');
 		return;
 	}
-
 	if (typeof SimulatorPage === 'undefined') {
 		console.error('[analysis] SimulatorPage is undefined (core js not loaded?)');
 		return;
@@ -40,98 +40,111 @@
 		}
 	})();
 
-	// Exercise meta is server truth (from DB -> session -> page-data).
-	// It is stable enough to build cache keys and drive initial state selection.
-	const EXERCISE_META = PAGE?.DATA?.EXERCISE_META || null;
+	const DELIVERY_META = PAGE?.DATA?.DELIVERY_META || null;
+	if (!DELIVERY_META) console.error('[analysis] missing DELIVERY_META in page-data');
 
+	const EXERCISE_META = PAGE?.DATA?.EXERCISE_META || null;
+	if (!EXERCISE_META) console.error('[analysis] missing EXERCISE_META in page-data');
 	console.log('[analysis] EXERCISE_META', EXERCISE_META);
 
-	// ------------------------------------------------------------
-	// 2) Local state container (in-memory)
-	// ------------------------------------------------------------
-	const state = {
-		// Published payload (cacheable): info sources, menus, static definitions, etc.
-		staticData: null,
-
-		// Runtime/published state payload (cacheable via ETag): built for current (theme, scenario, state, language)
-		stateData: null,
+	// Local runtime store payload
+	const EXERCISE_DATA = {
+		ui:{
+			team_no: Number(DELIVERY_META.team_no || 0),
+			language_code: String(DELIVERY_META.language_code || 'en'),
+		},
+		meta: {
+			outline_id: Number(EXERCISE_META.outline_id || 0),
+			skill_id: Number(EXERCISE_META.skill_id || 0),
+			exercise_no: Number(EXERCISE_META.exercise_no || 0),
+			theme_id: Number(EXERCISE_META.theme_id || 0),
+			scenario_id: Number(EXERCISE_META.scenario_id || 0),
+			format_id: Number(EXERCISE_META.format_id || 0),
+			step_no: Number(EXERCISE_META.step_no || 0),
+			current_state: Number(EXERCISE_META.current_state || 0),
+			next_state: Number(EXERCISE_META.next_state || 0),		
+			has_causality: Number(EXERCISE_META.has_causality || 0) === 1,
+			number_of_causes: Number(EXERCISE_META.number_of_causes || 0),
+			position_count: Number(EXERCISE_META.position_count || 0),
+			role_id: Number(EXERCISE_META.role_id || 0),
+			log_exercise_id: Number(EXERCISE_META.log_exercise_id || 0),
+			created_at: String(EXERCISE_META.created_at || ''),
+		},
+		case: {
+			versions: {},
+			visibility: {},
+			symptoms: [],
+			facts: [],
+			causes: [],
+			actions: [],
+			iteration: { text: '', },
+			description: { short_description: '', long_description: '', work_notes: '', },
+			reflection: { keep_text: '', improve_text: '', },
+			attachments: { id: 0, file_name: null, }
+		}
 	};
 
+	// Scope for endpoints
+	const scope = {
+		outline_id: Number(EXERCISE_META.outline_id || 0),
+		exercise_no: Number(EXERCISE_META.exercise_no || 0),
+		theme_id: Number(EXERCISE_META.theme_id || 0),
+		scenario_id: Number(EXERCISE_META.scenario_id || 0)
+	};
+
+	// These will be initialized in blocking()
+	let store = null;
+
 	// ------------------------------------------------------------
-	// 3) Refresh state payload (ETag-aware via cache-mode)
-	//
-	// Server-side 304 rule for exercise_state:
-	// - ETag is derived from theme_id + scenario_id + current_state + language_code
-	//
-	// Client-side:
-	// - We request in cache-mode so the ajax helper can:
-	//   - send If-None-Match automatically (if it has cached ETag)
-	//   - return cached data on 304 (or at least report status=304)
+	// 2) State loader (runtime)
 	// ------------------------------------------------------------
 	const refreshState = async () => {
-		// Payload is not used for server ETag anymore (ETag is fingerprint-based),
-		// but it is useful for telemetry/debugging and future extensions.
-		const payload = {
-			client_log_exercise_id: EXERCISE_META?.log_exercise_id || 0,
-			outline_id: EXERCISE_META?.outline_id || 0
-		};
+		if (!store) return;
 
-		console.log('[analysis] calling state endpoint payload', payload);
+		const res = await simulatorAjaxRequest('/ajax/problem/exercise/state.php', 'POST', scope);
 
-		const res = await simulatorAjaxRequest('/ajax/problem_exercise_state_content.php', 'POST', payload, {
-			mode: 'cache',
-
-			// IMPORTANT:
-			// Cache key must match the server’s publish key drivers for state.
-			cacheKey: `problem_state:v1:${EXERCISE_META.theme_id}:${EXERCISE_META.scenario_id}:${EXERCISE_META.current_state}:${EXERCISE_META.language_code}`,
-			cacheStore: simulatorCache.session
-		});
-
-		console.log('[analysis] state response', res);
-
-		// 304 means "nothing changed": keep existing stateData.
-		// (If your ajax helper returns cached data on 304, it will typically set res.data anyway,
-		//  but we do not require it here.)
-		if (res?.status === 304) {
-			console.log('[analysis] state 304 not modified');
+		if (!res?.ok) {
+			console.warn('[analysis] state load failed', res);
 			return;
 		}
 
-		if (!res?.ok) return;
+		const data = res.data || {};
+		const versions = data.versions || {};
+		const forms = data.forms || {};
 
-		// Some helpers return payload directly, others wrap in {data:...}.
-		// Keep the previous stateData if the response provides none.
-		state.stateData = res.data ?? state.stateData;
+		// Versions
+		Object.keys(versions).forEach((k) => {
+			store.setVersion(k, versions[k]);
+		});
 
-		// If server includes "state" in the payload, keep EXERCISE_META aligned.
-		// This ensures future cacheKey calculations are correct after a state transition.
-		if (state.stateData?.state) {
-			EXERCISE_META.current_state = state.stateData.state;
+		// Forms
+		if (forms.symptoms) store.get().case.symptoms = forms.symptoms;
+		if (forms.facts) store.get().case.facts = forms.facts;
+		if (forms.causes) store.get().case.causes = forms.causes;
+		if (forms.actions) store.get().case.actions = forms.actions;
+		if (forms.iteration) store.get().case.iteration = forms.iteration;
+		if (forms.description) store.get().case.description = forms.description;
+		if (forms.reflection) store.get().case.reflection = forms.reflection;
+		if (forms.attachments) store.get().case.attachments = forms.attachments;
+
+		// Visibility (optional – may be added later)
+		if (data.case && data.case.visibility) {
+			store.get().case.visibility = data.case.visibility;
 		}
 
-		// Apply to UI features (if present).
-		// These modules should be tolerant to partial/late state updates.
-		if (window.ProblemFormsUI?.applyState) {
-			window.ProblemFormsUI.applyState(state.stateData);
-		}
-		if (window.ProblemAnalysisUI?.applyState) {
-			window.ProblemAnalysisUI.applyState(state.stateData);
-		}
+		console.log('[analysis] state refreshed');
 	};
 
 	// ------------------------------------------------------------
-	// 4) Page lifecycle
+	// 3) Page lifecycle (hook-object signature)
 	// ------------------------------------------------------------
 	SimulatorPage.run({
-		id: 'training-problem-instructor-analysis',
+		id: 'training-instructor-problem-analysis',
 
-		// blocking():
-		// - Keep this lightweight to speed up first paint.
-		// - shared_content is already loaded by SimulatorPage before we get here.
 		blocking: async (ctx) => {
-			console.log('[analysis] blocking start', ctx);
+			console.log('[analysis] blocking entered');
 
-			// Ensure DOM mount exists (workspace skeleton)
+			// Always create the mount skeleton
 			$('#display_content').html(`
 				<div id="problem_analysis_layout">
 					<div id="problem_instruction"></div>
@@ -140,82 +153,60 @@
 				</div>
 			`);
 
-			// --------------------------------------------------------
-			// 4.1) Static payload (published + cacheable via ETag/304)
-			// Server publish key drivers for static:
-			// - theme_id + scenario_id + language_code
-			// --------------------------------------------------------
-			console.log('[analysis] calling static endpoint');
+			// Visible proof (placeholder)
+			$('#problem_forms').html(`
+				<div style="padding:12px;border:2px solid #0a0;">
+					FORMS PLACEHOLDER: layout mounted
+				</div>
+			`);
 
-			const resStatic = await simulatorAjaxRequest('/ajax/problem_exercise_static_content.php', 'POST', {}, {
-				mode: 'cache',
-				cacheKey: `problem_static:v1:${EXERCISE_META.theme_id}:${EXERCISE_META.scenario_id}:${EXERCISE_META.language_code}`,
-				cacheStore: simulatorCache.session
-			});
-
-			if (!resStatic?.ok) {
-				ctx.handleAuthFailure(resStatic);
-				throw new Error(resStatic?.error || 'static load failed');
+			// Build store (forms-core must be loaded for this page)
+			if (!window.simulatorFormsStore?.createStore) {
+				console.error('[analysis] simulatorFormsStore.createStore missing (forms store not loaded on this page)');
+				return;
 			}
 
-			state.staticData = resStatic.data;
+			store = window.simulatorFormsStore.createStore(EXERCISE_DATA);
+			window._debugStore = store;
 
-			console.log('[analysis] static ok', resStatic?.ok, resStatic);
+			// Optional: ensure containers (if the layout module is loaded)
+			if (window.ProblemFormsLayout?.ensureLayout) {
+				window.ProblemFormsLayout.ensureLayout('#problem_forms');
+			}
 
-			// --------------------------------------------------------
-			// 4.2) State payload (ETag-aware, often 304)
-			// - We load it here to have initial state ready for render().
-			// - If you want faster first paint, move this call to background()
-			//   and gate menu clicks on "ready".
-			// --------------------------------------------------------
+			// Load runtime state once (safe even if forms registry isn't present yet)
 			await refreshState();
 		},
 
-		// render():
-		// - Render chrome + apply whatever data we already have.
-		// - Feature modules should be robust if payloads are missing/late.
 		render: (ctx) => {
+			// Chrome
 			if (window.TopBarEngine?.render) window.TopBarEngine.render();
 			if (window.MenuBarEngine?.render) window.MenuBarEngine.render();
 
-			// Apply static payload
-			if (window.ProblemInfoSourcesUI?.applyStatic) {
-				window.ProblemInfoSourcesUI.applyStatic(state.staticData);
-			}
-			if (window.ProblemFormsUI?.applyStatic) {
-				window.ProblemFormsUI.applyStatic(state.staticData);
-			}
-
-			// Apply state payload
-			if (window.ProblemFormsUI?.applyState) {
-				window.ProblemFormsUI.applyState(state.stateData);
-			}
-			if (window.ProblemAnalysisUI?.applyState) {
-				window.ProblemAnalysisUI.applyState(state.stateData);
+			// If a forms registry is present, render all forms (placeholder modules)
+			if (store && window.ProblemFormsRegistry?.renderAll) {
+				window.ProblemFormsRegistry.renderAll(store);
 			}
 		},
 
-		// background():
-		// - Optional: heartbeat, background refreshers, non-critical prefetch.
-		// - If you choose to load state in background instead of blocking,
-		//   call refreshState() here and ensure menu clicks wait for readiness.
-		background: (ctx) => {
-			// Example (optional):
-			// refreshState();
-		},
-
-		// bind():
-		// - Bind minimal page-specific handlers.
-		// - Menu button handlers should live in shared feature scripts.
 		bind: (ctx) => {
+			// Bind common UI close buttons if available
 			if (window.HelpSidebar?.bindCloseButton) {
 				window.HelpSidebar.bindCloseButton();
+			}
+
+			// Bind placeholder form handlers (only if registry exists)
+			if (store && window.ProblemFormsRegistry?.bindAll) {
+				window.ProblemFormsRegistry.bindAll({
+					store,
+					scope
+				});
 			}
 		}
 	});
 
 	// ------------------------------------------------------------
-	// 5) Expose refresh hook for polling consumers
+	// 4) Expose refresh hook for polling consumers
 	// ------------------------------------------------------------
 	window.ProblemPageRefreshState = refreshState;
 })();

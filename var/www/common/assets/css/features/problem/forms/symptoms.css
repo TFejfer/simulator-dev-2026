@@ -1,0 +1,67 @@
+/* =========================== */
+/* ========== FORM ========== */
+/* =========================== */
+
+#add_symptom_btn { margin-top: 20px;}
+
+.grid-symptoms {
+	width: 100%;
+	display: grid;
+	grid-template-columns: 8fr 2fr;
+	grid-gap: 15px;
+}
+
+.grid-symptoms > *:nth-child(n+3) { padding-top: 18px; }
+
+.symptom-priority-inner {
+	display: grid;
+	place-items: center;
+	min-height: 18px;
+	margin-top: 0;
+}
+
+/* =========================== */
+/* ========== MODAL ========== */
+/* =========================== */
+
+.grid-symptom-edit {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	grid-template-rows: repeat(4, minmax(24px, auto));
+	grid-column-gap: 20px;
+	grid-row-gap: 20px;
+	grid-template-areas:
+		"sy-lab1 sy-lab1"
+		"sy-devi sy-func"
+		"sy-clar sy-clar"
+		"sy-expl sy-expl";
+}
+.symptom-label1 {
+	grid-area: sy-lab1;
+	text-transform: capitalize;
+}
+.symptom-deviation {
+	grid-area: sy-devi;
+}
+.symptom-function {
+	grid-area: sy-func;
+}
+.symptom-clarify {
+	grid-area: sy-clar;
+	border: 1px solid #ced4da;
+    border-radius: .25rem;
+	line-height: 1.5;
+}
+.symptom-explanation {
+	grid-area: sy-expl;
+	padding: 10px 20px;
+}
+.symptom-explanation::first-letter {
+    text-transform: capitalize;
+}
+.deviation-term {
+	font-weight: 500;
+}
+.deviation-definition {
+	font-style: italic;
+}

@@ -178,10 +178,24 @@ $trainingActiveRepo  = new \Modules\Training\Auth\Repositories\ActiveParticipant
 // ---------- 10) Training: Exercise meta (runtime cache + DB truth) ----------
 
 $exerciseRuntimeRepo = new \Modules\Training\Auth\Repositories\ExerciseRuntimeRepository($dbRuntime);
+$scenarioMetaRepo = null;
+
+// Optional dependency: only available if PROBLEM_CONTENT DB + class exist.
+// Bootstrap must NOT fatal if problem content layer is not loaded yet.
+if (isset($dbProblemContent) && $dbProblemContent instanceof \PDO
+	&& class_exists(\Modules\Problem\Content\Repositories\ProblemScenarioMetaRepository::class)
+) {
+	$scenarioMetaRepo = new \Modules\Problem\Content\Repositories\ProblemScenarioMetaRepository(
+		$dbProblemContent, // PROBLEM_CONTENT PDO
+		false,             // useApcu
+		300                // ttl
+	);
+}
 
 $exerciseMetaService = new \Modules\Training\Auth\Services\ExerciseMetaService(
-    $exerciseRuntimeRepo,
-    $trainingActiveRepo
+	$exerciseRuntimeRepo,
+	$trainingActiveRepo,
+	$scenarioMetaRepo
 );
 
 // League repo is a stub until league tables are wired
