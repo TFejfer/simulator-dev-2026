@@ -8,6 +8,7 @@ use Modules\Shared\Contracts\PayloadBuilderInterface;
 use Modules\Problem\Services\InfoSources\Builders\InboxInfoSourceBuilder;
 use Modules\Problem\Services\InfoSources\Builders\MaintenanceInfoSourceBuilder;
 use Modules\Problem\Services\InfoSources\Builders\ProcessInfoSourceBuilder;
+use Modules\Problem\Services\ThemeConfigurationItemsService;
 
 /**
  * ProblemExerciseStaticPayloadBuilder
@@ -16,13 +17,15 @@ use Modules\Problem\Services\InfoSources\Builders\ProcessInfoSourceBuilder;
  * - Inbox
  * - Maintenance
  * - Process
+ * - Theme configuration items (cis)
  */
 final class ProblemExerciseStaticPayloadBuilder implements PayloadBuilderInterface
 {
     public function __construct(
         private InboxInfoSourceBuilder $inbox,
         private MaintenanceInfoSourceBuilder $maintenance,
-        private ProcessInfoSourceBuilder $process
+        private ProcessInfoSourceBuilder $process,
+		private ThemeConfigurationItemsService $cis
     ) {}
 
     public function build(array $ctx): array
@@ -42,6 +45,7 @@ final class ProblemExerciseStaticPayloadBuilder implements PayloadBuilderInterfa
 			'theme_id' => $k->themeId,
 			'scenario_id' => $k->scenarioId,
 			'language_code' => $k->languageCode,
+			'cis' => $this->cis->build($k),
 			'sources' => [
 				'inbox' => $this->inbox->build($k),
 				'maintenance' => $this->maintenance->build($k),

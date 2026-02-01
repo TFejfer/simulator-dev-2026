@@ -5,7 +5,7 @@ namespace Modules\Problem\Repositories\Forms;
 
 use PDO;
 
-final class IterationRepository
+final class IterationsRepository
 {
     public function __construct(private PDO $db) {}
 
@@ -14,7 +14,7 @@ final class IterationRepository
     {
         $stmt = $this->db->prepare("
             SELECT text
-            FROM problem_form_iteration
+            FROM problem_form_iterations
             WHERE access_id = :access_id AND team_no = :team_no
               AND outline_id = :outline_id AND exercise_no = :exercise_no
               AND theme_id = :theme_id AND scenario_id = :scenario_id
@@ -38,7 +38,7 @@ final class IterationRepository
         string $text, string $actorToken
     ): void {
         $stmt = $this->db->prepare("
-            INSERT INTO problem_form_iteration
+            INSERT INTO problem_form_iterations
               (access_id, team_no, outline_id, exercise_no, theme_id, scenario_id, text, actor_token, updated_at)
             VALUES
               (:access_id, :team_no, :outline_id, :exercise_no, :theme_id, :scenario_id, :text, :actor_token, CURRENT_TIMESTAMP)

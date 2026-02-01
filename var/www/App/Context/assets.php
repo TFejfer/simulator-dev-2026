@@ -61,6 +61,10 @@ function resolve_assets(array $ctx): array
 		// Keep false by default.
 		// Only enable if a page explicitly needs legacy instructor-paced.js
 		$modules['problem-forms'] = true;
+		$libs['imagerotator'] = true;
+		$libs['flatpickr'] = true;
+		$libs['popper'] = true;
+		$libs['tippy'] = true;
 	}
 
 	return [

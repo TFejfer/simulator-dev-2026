@@ -187,6 +187,15 @@ final class SharedContentTextsRepository
         );
     }
 
+    public function readCiActionsRows(string $languageCode): array
+    {
+        return $this->readKeyTextRows(
+            masterTable: 'i18n_ci_actions_master',
+            transTable:  'i18n_ci_actions_translations',
+            languageCode: $languageCode
+        );
+    }
+
     // RISK SKILL CONTENT
     public function readRiskTermsRows(string $languageCode): array
     {

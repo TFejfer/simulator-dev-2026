@@ -25,6 +25,8 @@ try {
 	// format/step come from exercise_meta (server truth)
 	$formatId = is_array($exerciseMeta) ? (int)($exerciseMeta['format_id'] ?? 0) : 0;
 	$stepNo = is_array($exerciseMeta) ? (int)($exerciseMeta['step_no'] ?? 0) : 0;
+	$numberOfCauses = is_array($exerciseMeta) ? (int)($exerciseMeta['number_of_causes'] ?? 0) : 0;
+	$hasCausality = is_array($exerciseMeta) ? ((bool)($exerciseMeta['has_causality'] ?? false)) : false;
 
 	if ($formatId <= 0 || $stepNo <= 0) {
 		http_response_code(422);
@@ -43,7 +45,9 @@ try {
 		$scenarioId,
 		$skillId,
 		$formatId,
-		$stepNo
+		$stepNo,
+		$numberOfCauses,
+		$hasCausality
 	);
 
 	echo json_encode(['ok' => true, 'data' => $state, 'error' => null], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

@@ -11,9 +11,9 @@ use Modules\Problem\Repositories\Forms\SymptomsRepository;
 use Modules\Problem\Repositories\Forms\FactsRepository;
 use Modules\Problem\Repositories\Forms\CausesRepository;
 use Modules\Problem\Repositories\Forms\ActionsRepository;
-use Modules\Problem\Repositories\Forms\IterationRepository;
+use Modules\Problem\Repositories\Forms\IterationsRepository;
 use Modules\Problem\Repositories\Forms\DescriptionRepository;
-use Modules\Problem\Repositories\Forms\ReflectionRepository;
+use Modules\Problem\Repositories\Forms\ReflectionsRepository;
 use Modules\Problem\Repositories\Forms\AttachmentsRepository;
 
 final class ExerciseStateServiceFactory
@@ -39,9 +39,9 @@ final class ExerciseStateServiceFactory
 			new FactsRepository($dbRuntime),
 			new CausesRepository($dbRuntime),
 			new ActionsRepository($dbRuntime),
-			new IterationRepository($dbRuntime),
+			new IterationsRepository($dbRuntime),
 			new DescriptionRepository($dbRuntime),
-			new ReflectionRepository($dbRuntime),
+			new ReflectionsRepository($dbRuntime),
 			new AttachmentsRepository($dbRuntime),
 			$formRules
 		);

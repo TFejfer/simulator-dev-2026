@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * /var/www/ajax/problem/forms/iteration.php
+ * /var/www/ajax/problem/forms/iterations.php
  *
  * Dynamic endpoint (no cache).
  * CRUD:
@@ -46,7 +46,7 @@ try {
 		$scope['outline_id'],
 		$scope['exercise_no'],
 		$token,
-		'iteration',
+		'iterations',
 		$crud,
 		$expected,
 		$payload

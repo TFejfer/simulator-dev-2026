@@ -117,6 +117,9 @@ if (!empty($customScriptArr['problem-introduction'])) {
 if (!empty($customScriptArr['problem-forms'])) {
     echo $css('/common/assets/css/features/problem/forms/forms-shared.css');
     echo $css('/common/assets/css/features/problem/forms/symptoms.css');
+    echo $css('/common/assets/css/features/problem/forms/facts.css');
+    echo $css('/common/assets/css/features/problem/forms/causes.css');
+    echo $css('/common/assets/css/features/problem/forms/actions.css');
 }
 if (!empty($customScriptArr['problem-result-chart'])) {
     echo $css('/common/assets/css/problem-result-chart.css');

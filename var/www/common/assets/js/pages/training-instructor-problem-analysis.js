@@ -13,7 +13,7 @@
  * - Does NOT require forms to be loaded globally; only this page needs them.
  */
 
-/* global $, SimulatorPage, simulatorAjaxRequest */
+/* global $, SimulatorPage, simulatorAjaxRequest, simulatorCache */
 
 (() => {
 	'use strict';
@@ -94,9 +94,61 @@
 
 	// These will be initialized in blocking()
 	let store = null;
+	let exerciseStaticContent = null;
+	let exerciseStateContent = null;
+
+	// Make globals predictable for debugging (avoid undefined)
+	window.ProblemExerciseStaticContent = null;
+	window.ProblemExerciseStateContent = null;
 
 	// ------------------------------------------------------------
-	// 2) State loader (runtime)
+	// 1b) Published exercise content (non-blocking)
+	// ------------------------------------------------------------
+	const loadExerciseStaticContent = async () => {
+		const lang = EXERCISE_DATA.ui.language_code || 'en';
+		const cacheKey = `exercise_static:problem:v1:${scope.theme_id}:${scope.scenario_id}:${lang}`;
+
+		const res = await simulatorAjaxRequest('/ajax/problem_exercise_static_content.php', 'POST', {}, {
+			mode: 'cache',
+			cacheKey,
+			cacheStore: simulatorCache?.session
+		});
+
+		if (!res?.ok) {
+			console.warn('[analysis] static content load failed', res);
+			return null;
+		}
+
+		exerciseStaticContent = res.data || null;
+		window.ProblemExerciseStaticContent = exerciseStaticContent;
+		console.log('[analysis] static content loaded', exerciseStaticContent);
+		return exerciseStaticContent;
+	};
+
+	const loadExerciseStateContent = async () => {
+		const lang = EXERCISE_DATA.ui.language_code || 'en';
+		const state = Number(EXERCISE_META.current_state || 0) || 0;
+		const cacheKey = `exercise_state:problem:v1:${scope.theme_id}:${scope.scenario_id}:${state}:${lang}`;
+
+		const res = await simulatorAjaxRequest('/ajax/problem_exercise_state_content.php', 'POST', {}, {
+			mode: 'cache',
+			cacheKey,
+			cacheStore: simulatorCache?.session
+		});
+
+		if (!res?.ok) {
+			console.warn('[analysis] state content load failed', res);
+			return null;
+		}
+
+		exerciseStateContent = res.data || null;
+		window.ProblemExerciseStateContent = exerciseStateContent;
+		console.log('[analysis] state content loaded', exerciseStateContent);
+		return exerciseStateContent;
+	};
+
+	// ------------------------------------------------------------
+	// 2) State loader (runtime forms)
 	// ------------------------------------------------------------
 	const refreshState = async () => {
 		if (!store) return;
@@ -122,10 +174,13 @@
 		if (forms.facts) store.get().case.facts = forms.facts;
 		if (forms.causes) store.get().case.causes = forms.causes;
 		if (forms.actions) store.get().case.actions = forms.actions;
-		if (forms.iteration) store.get().case.iteration = forms.iteration;
-		if (forms.description) store.get().case.description = forms.description;
-		if (forms.reflection) store.get().case.reflection = forms.reflection;
+		if (forms.iterations) store.get().case.iterations = forms.iterations;
+		//if (forms.description) store.get().case.description = forms.description;
+		if (forms.reflections) store.get().case.reflections = forms.reflections;
 		if (forms.attachments) store.get().case.attachments = forms.attachments;
+
+		// KT forms: concerns and specifications
+
 
 		// Visibility (optional – may be added later)
 		if (data.case && data.case.visibility) {
@@ -174,6 +229,9 @@
 				window.ProblemFormsLayout.ensureLayout('#problem_forms');
 			}
 
+			// Static exercise content is needed by forms (e.g., CI names); load before first render
+			await loadExerciseStaticContent();
+
 			// Load runtime state once (safe even if forms registry isn't present yet)
 			await refreshState();
 		},
@@ -201,6 +259,15 @@
 					store,
 					scope
 				});
+			}
+		},
+
+		// Background: remaining published exercise content (state) without blocking render
+		background: async () => {
+			try {
+				await loadExerciseStateContent();
+			} catch (e) {
+				console.warn('[analysis] background content load failed', e);
 			}
 		}
 	});

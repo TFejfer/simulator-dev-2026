@@ -5,7 +5,7 @@ namespace Modules\Problem\Repositories\Forms;
 
 use PDO;
 
-final class ReflectionRepository
+final class ReflectionsRepository
 {
 	public function __construct(
 		private PDO $db
@@ -27,7 +27,7 @@ final class ReflectionRepository
 			SELECT
 				keep_text,
 				improve_text
-			FROM problem_form_reflection
+			FROM problem_form_reflections
 			WHERE access_id = :access_id
 			  AND team_no = :team_no
 			  AND outline_id = :outline_id
@@ -62,7 +62,7 @@ final class ReflectionRepository
 		string $actorToken
 	): void {
 		$stmt = $this->db->prepare("
-			INSERT INTO problem_form_reflection (
+			INSERT INTO problem_form_reflections (
 				access_id,
 				team_no,
 				outline_id,

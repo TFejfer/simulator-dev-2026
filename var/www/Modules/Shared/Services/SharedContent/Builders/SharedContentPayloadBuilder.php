@@ -81,7 +81,10 @@ final class SharedContentPayloadBuilder implements PayloadBuilderInterface
             'kt_terms' => $this->repo->rowsToMap(
                 $this->repo->readKtTermsRows($lang)
             ),
-
+            'ci_actions' => $this->repo->rowsToMap(
+                $this->repo->readCiActionsRows($lang)
+            ),
+            
             // RISK SKILL CONTENT
             'risk_terms' => $this->repo->rowsToMap(
                 $this->repo->readRiskTermsRows($lang)

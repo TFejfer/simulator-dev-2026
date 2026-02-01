@@ -1,0 +1,30 @@
+/* ========================== */
+/* ========== FORM ========== */
+/* ========================== */
+
+#add_action_btn { margin-top: 20px;}
+
+.grid-actions {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	grid-gap: 20px;
+	grid-auto-rows: auto;		
+}
+
+/* =========================== */
+/* ========== MODAL ========== */
+/* =========================== */
+
+.grid-modal-action {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	grid-template-rows: minmax(24px, auto) minmax(24px, auto);
+	grid-column-gap: 40px;
+	grid-row-gap: 40px;
+	grid-template-areas:
+		"ma-cis ma-actions"
+		"ma-effect ma-effect"
+}
+.ma-cis { grid-area: ma-cis; }
+.ma-actions { grid-area: ma-actions; }
+.ma-effect { grid-area: ma-effect; }

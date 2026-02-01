@@ -1,0 +1,116 @@
+/* ========================== */
+/* ========== FORM ========== */
+/* ========================== */
+
+/* List causes */
+.grid-cause-list {
+	display: grid;
+	grid-template-columns: 20px 1fr 1fr 1fr;
+	grid-template-rows: minmax(42px, auto);
+	grid-column-gap: 20px;
+	grid-template-areas:
+		"ca-li-drag ca-li-text ca-li-liho ca-li-evid"
+}
+.cause-list-drag {
+	grid-area: ca-li-drag;
+	margin: auto;
+	color: #aeaeae;
+}
+.cause-list-text {
+	grid-area: ca-li-text;
+}
+.cause-list-likelihood {
+	grid-area: ca-li-liho;
+}
+.cause-list-evidence {
+	grid-area: ca-li-evid;
+}
+.create-likely-cause {
+	color: var(--main-button-color) !important;
+	padding-top: 10px;
+}
+
+.grid-causes {
+	display: grid;
+	grid-template-columns: 1fr 1fr 1fr;
+	grid-gap: 20px;
+	grid-auto-rows: auto;		
+}
+
+.grid-cause-order {
+	display: grid;
+	grid-template-columns: minmax(400px, 1fr);
+	grid-column-gap: 10px;
+}
+
+#add_cause_btn {
+	margin-top: 20px;
+}
+#sortable {
+	list-style-type: none;
+	margin: 0;
+	padding: 0;
+	width: 100%;
+}
+#sortable li {
+	margin: 10px 10px 9px 0;
+	float: left;
+	width: 100%;
+	background: #fff !important;
+}
+
+#sortable .ui-state-default { border: 0px solid #fff !important; }
+.dragable { cursor: n-resize; }
+
+.line-through { text-decoration: line-through; }
+.true-cause { font-weight: 900; }
+
+/* =========================== */
+/* ========== MODAL ========== */
+/* =========================== */
+
+/* Add cause */
+.grid-cause-add {
+	display: grid;
+	grid-column-gap: 20px;
+	grid-template-columns: 1fr 1fr;
+}
+.grid-cause-add > div:nth-child(1) { padding-top: 7px; }
+
+/* Update cause */
+.grid-cause {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	grid-template-rows: minmax(24px, auto) minmax(24px, auto) minmax(24px, auto) minmax(24px, auto);
+	grid-gap: 20px;
+	grid-template-areas:
+		"ca-text ca-text"
+		"ca-liho ca-liho"
+		"ca-evid ca-evid"
+		"ca-prov ca-disp"
+}
+.cause-text { grid-area: ca-text; }
+.cause-liho { grid-area: ca-liho; }
+.cause-evid { grid-area: ca-evid; }
+.cause-proof {
+	border-radius: 2px;
+    border: 1px solid var(--main-button-color);
+	color: #000;
+	text-align: center;
+	cursor: pointer;
+	vertical-align: middle;
+	line-height: 45px;
+	width: 100%;
+}
+.cause-proven {
+	grid-area: ca-prov;
+	text-transform: uppercase;
+}
+.cause-disproven {
+	grid-area: ca-disp;
+	text-transform: uppercase;
+}
+.cause-selected {
+	color: var(--main-button-color) !important;
+	font-weight: 900;
+}

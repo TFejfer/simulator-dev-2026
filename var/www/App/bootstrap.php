@@ -130,6 +130,11 @@ $problemInfoSourceRepo = new \Modules\Problem\Repositories\ProblemInfoSourceRepo
     $dbRuntime
 );
 
+// ---------- 6.5) Problem: theme configuration items ----------
+
+$themeConfigurationItemsRepo = new \Modules\Problem\Repositories\ThemeConfigurationItems($dbProblemContent);
+$themeConfigurationItemsService = new \Modules\Problem\Services\ThemeConfigurationItemsService($themeConfigurationItemsRepo);
+
 // ---------- 7) Problem: InfoSource builders (existing) ----------
 // Builders depend on the repository (not PDO directly).
 
@@ -146,7 +151,8 @@ $systemLogBuilder     = new \Modules\Problem\Services\InfoSources\Builders\Syste
 $problemStaticPayloadBuilder = new \Modules\Problem\Services\ExercisePayload\Builders\ProblemExerciseStaticPayloadBuilder(
     $inboxBuilder,
     $maintenanceBuilder,
-    $processBuilder
+    $processBuilder,
+    $themeConfigurationItemsService
 );
 
 $problemStatePayloadBuilder = new \Modules\Problem\Services\ExercisePayload\Builders\ProblemExerciseStatePayloadBuilder(

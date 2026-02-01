@@ -16,11 +16,12 @@
 			<div class="problem-form-container">
 				<div id="display_symptoms"></div>
 				<div id="display_facts"></div>
+				<div id="display_attachments"></div>
 				<div id="display_causes"></div>
 				<div id="display_actions"></div>
-				<div id="display_iteration"></div>
+				<div id="display_iterations"></div>
 				<div id="display_description"></div>
-				<div id="display_reflection"></div>
+				<div id="display_reflections"></div>
 			</div>
 		`);
 	};

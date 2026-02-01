@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * /var/www/ajax/problem/forms/reflection.php
+ * /var/www/ajax/problem/forms/reflections.php
  *
  * Dynamic endpoint (no cache).
  * CRUD:

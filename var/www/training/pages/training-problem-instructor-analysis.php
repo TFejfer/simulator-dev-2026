@@ -106,6 +106,9 @@ $assets['js'][] = '/common/assets/js/features/problem/forms/forms-layout.js';
 // Forms - concrete
 $assets['js'][] = '/common/assets/js/features/problem/forms/symptoms.js';
 $assets['js'][] = '/common/assets/js/features/problem/forms/facts.js';
+$assets['js'][] = '/common/assets/js/features/problem/forms/causes.js';
+$assets['js'][] = '/common/assets/js/features/problem/forms/actions.js';
+$assets['js'][] = '/common/assets/js/features/problem/forms/iterations.js';
 
 // ------------------------------------------------------------
 // 7) Page class

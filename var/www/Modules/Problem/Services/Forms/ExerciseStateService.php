@@ -10,9 +10,9 @@ use Modules\Problem\Repositories\Forms\SymptomsRepository;
 use Modules\Problem\Repositories\Forms\FactsRepository;
 use Modules\Problem\Repositories\Forms\CausesRepository;
 use Modules\Problem\Repositories\Forms\ActionsRepository;
-use Modules\Problem\Repositories\Forms\IterationRepository;
+use Modules\Problem\Repositories\Forms\IterationsRepository;
 use Modules\Problem\Repositories\Forms\DescriptionRepository;
-use Modules\Problem\Repositories\Forms\ReflectionRepository;
+use Modules\Problem\Repositories\Forms\ReflectionsRepository;
 use Modules\Problem\Repositories\Forms\AttachmentsRepository;
 
 final class ExerciseStateService
@@ -24,9 +24,9 @@ final class ExerciseStateService
 		private FactsRepository $facts,
 		private CausesRepository $causes,
 		private ActionsRepository $actions,
-		private IterationRepository $iteration,
+		private IterationsRepository $iterations,
 		private DescriptionRepository $description,
-		private ReflectionRepository $reflection,
+		private ReflectionsRepository $reflections,
 		private AttachmentsRepository $attachments,
 		private FormRuleRepository $formRules
 	) {}
@@ -48,12 +48,16 @@ final class ExerciseStateService
 		int $scenarioId,
 		int $skillId,
 		int $formatId,
-		int $stepNo
+		int $stepNo,
+		int $numberOfCauses,
+		bool $hasCausality
 	): array {
 		$versions = $this->readVersions($accessId, $teamNo, $outlineId, $exerciseNo);
 
 		// Visibility from shared_content.form_rule
 		$visibility = $this->formRules->findVisibility($skillId, $formatId, $stepNo);
+		$visibility['iterations'] = $this->computeIterationVisibility($stepNo, $numberOfCauses, $hasCausality);
+
 
 		$out = [
 			'versions' => $versions,
@@ -65,15 +69,15 @@ final class ExerciseStateService
 				'facts' => $this->facts->read($accessId, $teamNo, $outlineId, $exerciseNo),
 				'causes' => $this->causes->read($accessId, $teamNo, $outlineId, $exerciseNo),
 				'actions' => $this->actions->read($accessId, $teamNo, $outlineId, $exerciseNo),
-				'iteration' => $this->iteration->read($accessId, $teamNo, $outlineId, $exerciseNo, $themeId, $scenarioId),
+				'iterations' => $this->iterations->read($accessId, $teamNo, $outlineId, $exerciseNo, $themeId, $scenarioId),
 				'description' => $this->description->read($accessId, $teamNo, $outlineId, $exerciseNo, $themeId, $scenarioId),
-				'reflection' => $this->reflection->read($accessId, $teamNo, $outlineId, $exerciseNo),
+				'reflections' => $this->reflections->read($accessId, $teamNo, $outlineId, $exerciseNo),
 				'attachments' => $this->attachments->readMeta($accessId, $teamNo, $outlineId, $exerciseNo, $themeId, $scenarioId),
 			],
 		];
 
 		// Normalize versions for known forms (stable client contract)
-		foreach (['symptoms','facts','causes','actions','iteration','description','reflection','attachments'] as $k) {
+		foreach (['symptoms','facts','causes','actions','iterations','description','reflections','attachments'] as $k) {
 			if (!isset($out['versions'][$k])) $out['versions'][$k] = 0;
 		}
 
@@ -107,5 +111,25 @@ final class ExerciseStateService
 			$out[$k] = (int)($row['version'] ?? 0);
 		}
 		return $out;
+	}
+
+	/**
+	 * Compute iteration form visibility based on step no, number of causes, and causality setting.
+	 */
+	private function computeIterationVisibility(int $stepNo, int $numberOfCauses, bool $hasCausality): int
+	{
+		// Legacy parity:
+		// - iteration only relevant from step 60
+		// - only if at least 2 causes exist
+		// - not if causality is enabled
+		if ($stepNo < 60) return 0;
+		if ($numberOfCauses < 2) return 0;
+		if ($hasCausality) return 0;
+
+		// Editable until completion
+		if ($stepNo < 100) return 1;
+
+		// After completion: visible, locked
+		return 3;
 	}
 }

@@ -7,9 +7,9 @@ use Modules\Problem\Repositories\Forms\ActionsRepository;
 use Modules\Problem\Repositories\Forms\CausesRepository;
 use Modules\Problem\Repositories\Forms\FactsRepository;
 use Modules\Problem\Repositories\Forms\SymptomsRepository;
-use Modules\Problem\Repositories\Forms\IterationRepository;
+use Modules\Problem\Repositories\Forms\IterationsRepository;
 use Modules\Problem\Repositories\Forms\DescriptionRepository;
-use Modules\Problem\Repositories\Forms\ReflectionRepository;
+use Modules\Problem\Repositories\Forms\ReflectionsRepository;
 
 final class FormsPayloadBuilder
 {
@@ -18,9 +18,9 @@ final class FormsPayloadBuilder
         private FactsRepository $facts,
         private CausesRepository $causes,
         private ActionsRepository $actions,
-        private IterationRepository $iteration,
+        private IterationsRepository $iterations,
         private DescriptionRepository $description,
-        private ReflectionRepository $reflection,
+        private ReflectionsRepository $reflections,
     ) {}
 
     /** @return array<string,mixed> */
@@ -38,9 +38,9 @@ final class FormsPayloadBuilder
             'facts'    => ['facts' => $this->facts->read($accessId, $teamNo, $outlineId, $exerciseNo)],
             'causes'   => ['causes' => $this->causes->read($accessId, $teamNo, $outlineId, $exerciseNo)],
             'actions'  => ['actions' => $this->actions->read($accessId, $teamNo, $outlineId, $exerciseNo)],
-            'iteration'=> ['iteration' => $this->iteration->read($accessId, $teamNo, $outlineId, $exerciseNo, $themeId, $scenarioId)],
+            'iterations'=> ['iterations' => $this->iterations->read($accessId, $teamNo, $outlineId, $exerciseNo, $themeId, $scenarioId)],
             'description'=> ['description' => $this->description->read($accessId, $teamNo, $outlineId, $exerciseNo, $themeId, $scenarioId)],
-            'reflection'=> ['reflection' => $this->reflection->read($accessId, $teamNo, $outlineId, $exerciseNo)],
+            'reflections'=> ['reflections' => $this->reflections->read($accessId, $teamNo, $outlineId, $exerciseNo)],
             default => throw new \InvalidArgumentException('Unknown form_key'),
         };
     }

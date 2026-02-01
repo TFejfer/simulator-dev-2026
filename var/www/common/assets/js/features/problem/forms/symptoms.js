@@ -1,21 +1,10 @@
 /* symptoms.js
  *
- * Problem > Symptoms form (migrated from legacy; optimized + corrected for MAP-based term payloads).
+ * Problem > Symptoms form (MAP-based term payloads).
  *
- * ✅ Keeps the SAME UI content/structure as legacy:
- * - Method/restore details (details/summary + content)
- * - Symptom list with two fieldsets per row (symptom + priority)
- * - "Add symptom" link when editable
- * - Modal for create/edit
- * - Priority toggle (with validation)
- * - Delete (with confirm)
- *
- * ✅ Works with SIM_SHARED term payloads as MAPS (objects), e.g.:
- *   deviations = { "1":"...", "2":"..." }
- *   common_terms = { "287":"Save", ... }
- *
- * Modes (case.visibility.symptoms):
- * 0 hidden, 1 enabled, 2 limited, 3 disabled
+ * Fixes included:
+ * - After any successful write (create/update/delete/priority), re-render Facts
+ *   because Facts has a computed "what_not" derived from prioritized symptom.
  */
 
 /* global $, simulatorShowConfirm, showSimulatorModal, hideSimulatorModal */
@@ -32,8 +21,6 @@
 	const tMap = (bucket, id, fallback = '') => {
 		const src = window.SIM_SHARED?.[bucket];
 		if (!src || typeof src !== 'object') return fallback;
-
-		// supports both numeric and string keys
 		const v = src[String(id)];
 		return (typeof v === 'string' && v !== '') ? v : fallback;
 	};
@@ -51,20 +38,15 @@
 		return (m && typeof m === 'object') ? m : {};
 	};
 
-	// Functions can be either:
-	// A) array of rows: [{theme_id, function_id, text_value}, ...]
-	// B) map: {"1":"text", ...}  (less likely for functions, but supported)
 	const functionsRaw = () => window.SIM_SHARED?.functions;
 
 	const functionText = (themeId, functionId) => {
 		const raw = functionsRaw();
 
-		// Map case
 		if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
 			return raw[String(functionId)] || '';
 		}
 
-		// Array case
 		if (Array.isArray(raw)) {
 			const row = raw.find((r) =>
 				String(r?.theme_id ?? '') === String(themeId) &&
@@ -76,9 +58,7 @@
 		return '';
 	};
 
-	const deviationText = (deviationId) => {
-		return deviationsMap()[String(deviationId)] || '';
-	};
+	const deviationText = (deviationId) => deviationsMap()[String(deviationId)] || '';
 
 	// ---------------------------------
 	// Store helpers
@@ -86,7 +66,7 @@
 	const getMode = (store) => store.get().case?.visibility?.[FORM_KEY] ?? 0;
 	const editable = (mode) => mode === 1;
 
-	const getThemeId = (store) => store.get().meta.theme_id ?? 0;
+	const getThemeId = (store) => store.get().meta?.theme_id ?? store.get().meta?.exercise?.theme_id ?? 0;
 
 	const getSymptoms = (store) => {
 		const arr = store.get().case?.symptoms;
@@ -120,7 +100,6 @@
 	};
 
 	const renderRestoreMethod = () => {
-		// This keeps the legacy structure but reads from MAP terms.
 		return `
 			<div id="met_step1">
 				<ul>
@@ -163,7 +142,6 @@
 	const buildFunctionSelect = (themeId) => {
 		const raw = functionsRaw();
 
-		// Map case (no theme dimension). Use all entries.
 		if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
 			const entries = Object.entries(raw)
 				.sort((a, b) => parseInt(a[0], 10) - parseInt(b[0], 10));
@@ -176,7 +154,6 @@
 			`;
 		}
 
-		// Array case (theme aware)
 		const rows = Array.isArray(raw)
 			? raw.filter((r) => String(r?.theme_id ?? '') === String(themeId))
 			: [];
@@ -200,7 +177,6 @@
 			</div>
 		`).join('');
 
-		// Legacy behavior: in edit-mode, selects are disabled
 		const devSelectHtml = lockSelects ? deviationSelect.replace('required', 'disabled') : deviationSelect;
 		const fnSelectHtml = lockSelects ? functionSelect.replace('required', 'disabled') : functionSelect;
 
@@ -300,10 +276,17 @@
 	};
 
 	// ---------------------------------
+	// Cross-form refresh helper
+	// ---------------------------------
+	const refreshFacts = (store) => {
+		// Facts depends on prioritized symptom for what_not (computed).
+		window.ProblemFormFacts?.render?.(store);
+	};
+
+	// ---------------------------------
 	// Events
 	// ---------------------------------
 	const bind = ({ store, scope }) => {
-		// Open create modal
 		$(document).on('click', '#symptom_insert_modal', () => {
 			if (!editable(getMode(store))) return;
 
@@ -316,7 +299,6 @@
 			showSimulatorModal('simulator_modal_common');
 		});
 
-		// Open edit modal
 		$(document).on('click', '.symptom-update-modal', function () {
 			if (!editable(getMode(store))) return;
 
@@ -340,7 +322,6 @@
 			showSimulatorModal('simulator_modal_common');
 		});
 
-		// Upsert create/update
 		$(document).on('click', '.upsert-symptom.std-btn-enabled', async function (e) {
 			e.preventDefault();
 			e.stopImmediatePropagation();
@@ -376,9 +357,9 @@
 			if (!res?.ok) console.warn('[symptoms] upsert failed', res);
 
 			render(store);
+			refreshFacts(store);
 		});
 
-		// Priority
 		$(document).on('click', '.symptom-priority', async function () {
 			if (!editable(getMode(store))) return;
 
@@ -402,12 +383,13 @@
 			}
 
 			const res = await window.ProblemFormsController.writeForm(FORM_KEY, 'priority', { id }, store, scope);
+
 			if (!res?.ok) console.warn('[symptoms] priority failed', res);
 
 			render(store);
+			refreshFacts(store);
 		});
 
-		// Delete
 		$(document).on('click', '.delete-symptom', function () {
 			if (!editable(getMode(store))) return;
 
@@ -424,10 +406,13 @@
 						text: Common(223, 'OK'),
 						action: async () => {
 							const res = await window.ProblemFormsController.writeForm(FORM_KEY, 'delete', { id }, store, scope);
+
 							hideSimulatorModal('simulator_modal_common');
 
 							if (!res?.ok) console.warn('[symptoms] delete failed', res);
+
 							render(store);
+							refreshFacts(store);
 						}
 					},
 					cancel: {
@@ -439,6 +424,5 @@
 		});
 	};
 
-	// Register module
 	window.ProblemFormsRegistry.register({ key: FORM_KEY, render, bind });
 })();

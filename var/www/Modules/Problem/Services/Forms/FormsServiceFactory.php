@@ -9,9 +9,9 @@ use Modules\Problem\Repositories\Forms\SymptomsRepository;
 use Modules\Problem\Repositories\Forms\FactsRepository;
 use Modules\Problem\Repositories\Forms\CausesRepository;
 use Modules\Problem\Repositories\Forms\ActionsRepository;
-use Modules\Problem\Repositories\Forms\IterationRepository;
+use Modules\Problem\Repositories\Forms\IterationsRepository;
 use Modules\Problem\Repositories\Forms\DescriptionRepository;
-use Modules\Problem\Repositories\Forms\ReflectionRepository;
+use Modules\Problem\Repositories\Forms\ReflectionsRepository;
 
 final class FormsServiceFactory
 {
@@ -28,9 +28,9 @@ final class FormsServiceFactory
 		$causes = new CausesRepository($dbRuntime);
 		$actions = new ActionsRepository($dbRuntime);
 
-		$iteration = new IterationRepository($dbRuntime);
+		$iterations = new IterationsRepository($dbRuntime);
 		$description = new DescriptionRepository($dbRuntime);
-		$reflection = new ReflectionRepository($dbRuntime);
+		$reflections = new ReflectionsRepository($dbRuntime);
 
 		$workflow = new \Modules\Problem\Repositories\WorkflowLogRepository($dbRuntime);
 
@@ -39,9 +39,9 @@ final class FormsServiceFactory
 			$facts,
 			$causes,
 			$actions,
-			$iteration,
+			$iterations,
 			$description,
-			$reflection
+			$reflections
 		);
 
 		return new FormsService(
@@ -51,9 +51,9 @@ final class FormsServiceFactory
 			$facts,
 			$causes,
 			$actions,
-			$iteration,
+			$iterations,
 			$description,
-			$reflection,
+			$reflections,
 			$payloadBuilder,
 			$workflow
 		);

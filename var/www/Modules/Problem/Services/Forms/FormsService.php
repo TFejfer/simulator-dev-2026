@@ -14,9 +14,9 @@ use Modules\Problem\Repositories\Forms\SymptomsRepository;
 use Modules\Problem\Repositories\Forms\FactsRepository;
 use Modules\Problem\Repositories\Forms\CausesRepository;
 use Modules\Problem\Repositories\Forms\ActionsRepository;
-use Modules\Problem\Repositories\Forms\IterationRepository;
+use Modules\Problem\Repositories\Forms\IterationsRepository;
 use Modules\Problem\Repositories\Forms\DescriptionRepository;
-use Modules\Problem\Repositories\Forms\ReflectionRepository;
+use Modules\Problem\Repositories\Forms\ReflectionsRepository;
 use Modules\Problem\Repositories\WorkflowLogRepository;
 
 final class FormsService
@@ -28,9 +28,9 @@ final class FormsService
         private FactsRepository $facts,
         private CausesRepository $causes,
         private ActionsRepository $actions,
-        private IterationRepository $iteration,
+        private IterationsRepository $iterations,
         private DescriptionRepository $description,
-        private ReflectionRepository $reflection,
+        private ReflectionsRepository $reflections,
         private FormsPayloadBuilder $payloadBuilder,
         private WorkflowLogRepository $workflow,
     ) {}
@@ -342,6 +342,18 @@ final class FormsService
 
                     return;
                 }
+                if ($req->crud === 'update') {
+                    $this->causes->update(
+                        $req->accessId, $req->teamNo, $req->outlineId, $req->exerciseNo,
+                        (int)($p['id'] ?? 0),
+                        (string)($p['likelihood_text'] ?? ''),
+                        (string)($p['evidence_text'] ?? ''),
+                        (int)($p['proven'] ?? 0),
+                        (int)($p['disproven'] ?? 0),
+                        $req->actorToken
+                    );
+                    return;
+                }
                 if ($req->crud === 'arrange') {
                     $ids = $p['ids_in_order'] ?? [];
                     if (!is_array($ids)) $ids = [];
@@ -429,9 +441,9 @@ final class FormsService
                 }
                 break;
 
-            case 'iteration':
+            case 'iterations':
                 if ($req->crud === 'upsert') {
-                    $this->iteration->upsert(
+                    $this->iterations->upsert(
                         $req->accessId, $req->teamNo, $req->outlineId, $req->exerciseNo,
                         $themeId, $scenarioId,
                         (string)($p['text'] ?? ''),
@@ -455,9 +467,9 @@ final class FormsService
                 }
                 break;
 
-            case 'reflection':
+            case 'reflections':
                 if ($req->crud === 'upsert') {
-                    $this->reflection->upsert(
+                    $this->reflections->upsert(
                         $req->accessId, $req->teamNo, $req->outlineId, $req->exerciseNo,
                         (string)($p['keep_text'] ?? ''),
                         (string)($p['improve_text'] ?? ''),
