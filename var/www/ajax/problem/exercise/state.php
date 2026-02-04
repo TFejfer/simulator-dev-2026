@@ -3,7 +3,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../_guard_dynamic.php';
 
-// Read exercise_meta BEFORE bootstrap closes the session
+// Read meta BEFORE bootstrap closes the session
+$deliveryMeta = $_SESSION['delivery_meta'] ?? null;
 $exerciseMeta = $_SESSION['exercise_meta'] ?? null;
 
 require_once __DIR__ . '/../_forms_bootstrap.php';
@@ -28,13 +29,22 @@ try {
 	$numberOfCauses = is_array($exerciseMeta) ? (int)($exerciseMeta['number_of_causes'] ?? 0) : 0;
 	$hasCausality = is_array($exerciseMeta) ? ((bool)($exerciseMeta['has_causality'] ?? false)) : false;
 
+	$templateId = is_array($deliveryMeta) ? (int)($deliveryMeta['template_id'] ?? 0) : 0;
+	$templateCode = is_array($deliveryMeta) ? (string)($deliveryMeta['template_code'] ?? 'default') : 'default';
+
+	if ($templateId <= 0) {
+		http_response_code(422);
+		echo json_encode(['ok' => false, 'data' => null, 'error' => 'Missing template_id (delivery_meta)'], JSON_UNESCAPED_UNICODE);
+		exit;
+	}
+
 	if ($formatId <= 0 || $stepNo <= 0) {
 		http_response_code(422);
 		echo json_encode(['ok' => false, 'data' => null, 'error' => 'Missing format_id or step_no (exercise_meta)'], JSON_UNESCAPED_UNICODE);
 		exit;
 	}
 
-	$svc = ExerciseStateServiceFactory::make($dbRuntime);
+	$svc = ExerciseStateServiceFactory::make($dbRuntime, $templateCode);
 
 	$state = $svc->readAllForms(
 		$scope['access_id'],
@@ -46,6 +56,7 @@ try {
 		$skillId,
 		$formatId,
 		$stepNo,
+		$templateId,
 		$numberOfCauses,
 		$hasCausality
 	);

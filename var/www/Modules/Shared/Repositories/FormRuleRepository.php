@@ -12,53 +12,74 @@ final class FormRuleRepository
 	) {}
 
 	/**
-	 * Returns numeric visibility modes for the requested scope.
+	 * Returns ordered, template-aware form configuration for a step.
 	 *
 	 * Output contract (used by UI):
-	 * - 0 = hidden
-	 * - 1 = enabled (editable)
-	 * - 2 = limited (visible, no buttons)
-	 * - 3 = disabled (visible, locked)
+	 * [
+	 *   [
+	 *     'form_code' => 'symptoms',
+	 *     'mode'      => 1, // 1=enabled, 2=limited, 3=disabled
+	 *     'component' => 'problem/default/symptoms'
+	 *   ],
+	 *   ...
+	 * ]
 	 *
-	 * @return array<string,int> e.g. ['symptoms'=>1,'facts'=>2,...]
+	 * Rules:
+	 * - Only forms enabled by template are returned
+	 * - Only forms visible in this step are returned (is_visible=1)
+	 * - Ordering: template.sort_order → global sort_order → form_code
 	 */
-	public function findVisibility(int $skillId, int $formatId, int $stepNo): array
-	{
+	public function findFormsForStep(
+		int $skillId,
+		int $formatId,
+		int $stepNo,
+		int $templateId
+	): array {
 		$stmt = $this->dbSharedContent->prepare("
-			SELECT form, is_visible, mode
-			FROM form_rule
-			WHERE skill_id = :skill_id
-			  AND format_id = :format_id
-			  AND step_no = :step_no
+			SELECT
+				fr.form AS form_code,
+
+				CASE fr.mode
+					WHEN 'enabled'  THEN 1
+					WHEN 'limited'  THEN 2
+					WHEN 'disabled' THEN 3
+					ELSE 3
+				END AS mode,
+
+				ti.component AS component,
+
+				COALESCE(
+					NULLIF(ti.sort_order, 0),
+					mfc.sort_order,
+					1000
+				) AS sort_order_effective
+
+			FROM form_rule fr
+			JOIN meta_form_template_items ti
+			  ON ti.template_id = :template_id
+			 AND ti.form_key = fr.form
+			 AND ti.enabled = 1
+
+			LEFT JOIN meta_form_code mfc
+			  ON mfc.skill_id = fr.skill_id
+			 AND mfc.form_code = fr.form
+			 AND mfc.is_active = 1
+
+			WHERE fr.skill_id  = :skill_id
+			  AND fr.format_id = :format_id
+			  AND fr.step_no   = :step_no
+			  AND fr.is_visible = 1
+
+			ORDER BY sort_order_effective ASC, fr.form ASC
 		");
+
 		$stmt->execute([
-			':skill_id' => $skillId,
-			':format_id' => $formatId,
-			':step_no' => $stepNo,
+			':skill_id'   => $skillId,
+			':format_id'  => $formatId,
+			':step_no'    => $stepNo,
+			':template_id'=> $templateId,
 		]);
 
-		$map = [];
-
-		while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-			$form = (string)($row['form'] ?? '');
-			if ($form === '') continue;
-
-			$isVisible = (int)($row['is_visible'] ?? 0);
-			$mode = (string)($row['mode'] ?? 'disabled');
-
-			if ($isVisible <= 0) {
-				$map[$form] = 0;
-				continue;
-			}
-
-			$map[$form] = match ($mode) {
-				'enabled' => 1,
-				'limited' => 2,
-				'disabled' => 3,
-				default => 3,
-			};
-		}
-
-		return $map;
+		return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 	}
 }

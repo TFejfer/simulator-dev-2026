@@ -32,10 +32,13 @@ final class ExerciseStateService
 	) {}
 
 	/**
-	 * Read canonical state for all forms + versions + visibility in one response.
+	 * Read canonical state for relevant forms + versions + UI form config.
 	 *
-	 * IMPORTANT:
-	 * Visibility comes from SHARED_CONTENT.form_rule (skill_id + format_id + step_no).
+	 * Core rules:
+	 * - UI form plan comes from SHARED_CONTENT (form_rule + template items) via FormRuleRepository.
+	 * - Iterations is additionally filtered/overridden by runtime policy:
+	 *   - hidden if causality enabled or <2 causes or step < 60
+	 *   - locked after completion
 	 *
 	 * @return array<string,mixed>
 	 */
@@ -49,39 +52,138 @@ final class ExerciseStateService
 		int $skillId,
 		int $formatId,
 		int $stepNo,
+		int $templateId,
 		int $numberOfCauses,
 		bool $hasCausality
 	): array {
 		$versions = $this->readVersions($accessId, $teamNo, $outlineId, $exerciseNo);
 
-		// Visibility from shared_content.form_rule
-		$visibility = $this->formRules->findVisibility($skillId, $formatId, $stepNo);
-		$visibility['iterations'] = $this->computeIterationVisibility($stepNo, $numberOfCauses, $hasCausality);
+		// Ordered list of forms for this step, template-aware (only is_visible=1)
+		$uiForms = $this->formRules->findFormsForStep($skillId, $formatId, $stepNo, $templateId);
 
+		// Runtime policy for iterations (may override or remove)
+		$iterMode = $this->computeIterationVisibility($stepNo, $numberOfCauses, $hasCausality);
 
-		$out = [
-			'versions' => $versions,
-			'case' => [
-				'visibility' => $visibility,
-			],
-			'forms' => [
-				'symptoms' => $this->symptoms->read($accessId, $teamNo, $outlineId, $exerciseNo),
-				'facts' => $this->facts->read($accessId, $teamNo, $outlineId, $exerciseNo),
-				'causes' => $this->causes->read($accessId, $teamNo, $outlineId, $exerciseNo),
-				'actions' => $this->actions->read($accessId, $teamNo, $outlineId, $exerciseNo),
-				'iterations' => $this->iterations->read($accessId, $teamNo, $outlineId, $exerciseNo, $themeId, $scenarioId),
-				'description' => $this->description->read($accessId, $teamNo, $outlineId, $exerciseNo, $themeId, $scenarioId),
-				'reflections' => $this->reflections->read($accessId, $teamNo, $outlineId, $exerciseNo),
-				'attachments' => $this->attachments->readMeta($accessId, $teamNo, $outlineId, $exerciseNo, $themeId, $scenarioId),
-			],
-		];
+		// Apply iterations policy to UI plan:
+		// - if hidden => remove from uiForms
+		// - if locked => force mode=3 for iterations row
+		if (!empty($uiForms)) {
+			$tmp = [];
+			foreach ($uiForms as $row) {
+				$form = (string)($row['form_code'] ?? '');
+				if ($form === '') continue;
+
+				if ($form === 'iterations') {
+					if ($iterMode === 0) {
+						// hide iterations entirely
+						continue;
+					}
+					if ($iterMode === 3) {
+						$row['mode'] = 3;
+					}
+				}
+				$tmp[] = $row;
+			}
+			$uiForms = $tmp;
+		}
+
+		// Build visibility map (backwards compatible: form_code => 0/1/2/3)
+		$visibility = [];
+		foreach ($uiForms as $row) {
+			$form = (string)($row['form_code'] ?? '');
+			if ($form === '') continue;
+			$visibility[$form] = (int)($row['mode'] ?? 3);
+		}
+		// Ensure iterations key exists in visibility map (stable client contract)
+		if (!isset($visibility['iterations'])) {
+			$visibility['iterations'] = 0;
+		}
+
+		// Load only the forms in the ui plan (plus policy already applied)
+		$formData = [];
+		foreach ($uiForms as $row) {
+			$form = (string)($row['form_code'] ?? '');
+			if ($form === '') continue;
+
+			switch ($form) {
+				case 'symptoms':
+					$formData['symptoms'] = $this->symptoms->read($accessId, $teamNo, $outlineId, $exerciseNo);
+					break;
+
+				case 'facts':
+					$formData['facts'] = $this->facts->read($accessId, $teamNo, $outlineId, $exerciseNo);
+					break;
+
+				case 'causes':
+					$formData['causes'] = $this->causes->read($accessId, $teamNo, $outlineId, $exerciseNo);
+					break;
+
+				case 'actions':
+					$formData['actions'] = $this->actions->read($accessId, $teamNo, $outlineId, $exerciseNo);
+					break;
+
+				case 'iterations':
+					// Only load if still present (policy already applied)
+					$formData['iterations'] = $this->iterations->read(
+						$accessId,
+						$teamNo,
+						$outlineId,
+						$exerciseNo,
+						$themeId,
+						$scenarioId
+					);
+					break;
+
+				case 'description':
+				case 'worknotes': // worknotes shares the description table/endpoint
+					$formData['description'] = $this->description->read(
+						$accessId,
+						$teamNo,
+						$outlineId,
+						$exerciseNo,
+						$themeId,
+						$scenarioId
+					);
+					break;
+
+				case 'reflections':
+					$formData['reflections'] = $this->reflections->read($accessId, $teamNo, $outlineId, $exerciseNo);
+					break;
+
+				case 'attachments':
+					$formData['attachments'] = $this->attachments->readMeta(
+						$accessId,
+						$teamNo,
+						$outlineId,
+						$exerciseNo,
+						$themeId,
+						$scenarioId
+					);
+					break;
+
+				// If you add more forms later, handle them here.
+				default:
+					break;
+			}
+		}
 
 		// Normalize versions for known forms (stable client contract)
 		foreach (['symptoms','facts','causes','actions','iterations','description','reflections','attachments'] as $k) {
-			if (!isset($out['versions'][$k])) $out['versions'][$k] = 0;
+			if (!isset($versions[$k])) $versions[$k] = 0;
 		}
 
-		return $out;
+		return [
+			'versions' => $versions,
+
+			// Backwards compatible contract (you previously returned case.visibility)
+			'case' => [
+				'visibility' => $visibility,
+				// New: ordered plan incl. component + mode
+				'forms' => $uiForms,
+			],
+
+			'forms' => $formData,
+		];
 	}
 
 	/**
@@ -114,16 +216,22 @@ final class ExerciseStateService
 	}
 
 	/**
-	 * Compute iteration form visibility based on step no, number of causes, and causality setting.
+	 * Runtime policy for iterations.
+	 *
+	 * Returns numeric visibility modes:
+	 * - 0 = hidden
+	 * - 1 = enabled (editable)
+	 * - 3 = disabled (visible, locked)
 	 */
 	private function computeIterationVisibility(int $stepNo, int $numberOfCauses, bool $hasCausality): int
 	{
-		// Legacy parity:
-		// - iteration only relevant from step 60
-		// - only if at least 2 causes exist
-		// - not if causality is enabled
+		// iterations only relevant from step 60
 		if ($stepNo < 60) return 0;
+
+		// only if at least 2 causes exist
 		if ($numberOfCauses < 2) return 0;
+
+		// not if causality is enabled
 		if ($hasCausality) return 0;
 
 		// Editable until completion

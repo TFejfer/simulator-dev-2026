@@ -30,6 +30,13 @@ try {
 	$expected = Request::int($in, 'expected_version', 0);
 	$payload = Request::arr($in, 'payload');
 
+	// Only allow the supported verbs for this endpoint
+	if (!in_array($crud, ['read', 'upsert'], true)) {
+		http_response_code(422);
+		echo json_encode(['ok' => false, 'data' => null, 'error' => 'Invalid crud'], JSON_UNESCAPED_UNICODE);
+		exit;
+	}
+
 	$service = FormsServiceFactory::make($dbRuntime);
 
 	$req = new FormRequest(
@@ -38,7 +45,7 @@ try {
 		$scope['outline_id'],
 		$scope['exercise_no'],
 		$token,
-		'reflection',
+		'reflections', // IMPORTANT: must match canonical form_code used in plan + JS
 		$crud,
 		$expected,
 		$payload

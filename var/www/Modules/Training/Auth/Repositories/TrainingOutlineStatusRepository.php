@@ -48,24 +48,26 @@ final class TrainingOutlineStatusRepository
             $stmt = $this->dbRuntime->prepare("
                 SELECT
                     u.exercise_no,
-                    GREATEST(0, :window - TIMESTAMPDIFF(SECOND, u.created_at, NOW())) AS seconds_left
+                    GREATEST(0, :window_outer - TIMESTAMPDIFF(SECOND, u.created_at, NOW())) AS seconds_left
                 FROM log_exercise_unlock u
                 INNER JOIN (
                     SELECT exercise_no, MAX(created_at) AS max_created_at
                     FROM log_exercise_unlock
-                    WHERE access_id = :access_id
-                      AND TIMESTAMPDIFF(SECOND, created_at, NOW()) < :window
+                    WHERE access_id = :access_id_inner
+                      AND TIMESTAMPDIFF(SECOND, created_at, NOW()) < :window_inner
                     GROUP BY exercise_no
                 ) x
                   ON x.exercise_no = u.exercise_no
                  AND x.max_created_at = u.created_at
-                WHERE u.access_id = :access_id
+                WHERE u.access_id = :access_id_outer
                 ORDER BY u.exercise_no ASC
             ");
 
             $stmt->execute([
-                ':access_id' => $accessId,
-                ':window'    => $windowSeconds,
+                ':access_id_outer' => $accessId,
+                ':access_id_inner' => $accessId,
+                ':window_outer'    => $windowSeconds,
+                ':window_inner'    => $windowSeconds,
             ]);
 
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);

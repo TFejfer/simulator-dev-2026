@@ -61,6 +61,19 @@
 			role: pd?.DATA?.ROLE || null
 		};
 
+		// Fallback countdown durations for formats that must count down even when backend omits deadline/seconds_left.
+		const sharedParams = window.SIM_SHARED?.exercise_parameters || {};
+		const sharedDiscovery = Number(sharedParams.problem_discovery_time || sharedParams.discovery_time || 0);
+		const fallbackSeconds = { 1: 25 * 60, 10: 25 * 60, 11: 25 * 60 };
+		const fallback = sharedDiscovery > 0 ? sharedDiscovery : (fallbackSeconds[ctx.format_no] || 0);
+		if (fallback && ctx.exercise_start_unix > 0 && ctx.server_now_unix > 0
+			&& ctx.deadline_unix <= 0 && ctx.seconds_left <= 0) {
+			const elapsed = Math.max(0, ctx.server_now_unix - ctx.exercise_start_unix);
+			const remaining = Math.max(0, fallback - elapsed);
+			ctx.deadline_unix = ctx.exercise_start_unix + fallback;
+			ctx.seconds_left = remaining;
+		}
+
 		return merge(ctx, overrides);
 	};
 

@@ -10,6 +10,7 @@ use Modules\Problem\Repositories\Forms\SymptomsRepository;
 use Modules\Problem\Repositories\Forms\IterationsRepository;
 use Modules\Problem\Repositories\Forms\DescriptionRepository;
 use Modules\Problem\Repositories\Forms\ReflectionsRepository;
+use Modules\Problem\Repositories\Forms\SpecificationRepository;
 
 final class FormsPayloadBuilder
 {
@@ -21,6 +22,7 @@ final class FormsPayloadBuilder
         private IterationsRepository $iterations,
         private DescriptionRepository $description,
         private ReflectionsRepository $reflections,
+        private SpecificationRepository $specification
     ) {}
 
     /** @return array<string,mixed> */
@@ -41,6 +43,7 @@ final class FormsPayloadBuilder
             'iterations'=> ['iterations' => $this->iterations->read($accessId, $teamNo, $outlineId, $exerciseNo, $themeId, $scenarioId)],
             'description'=> ['description' => $this->description->read($accessId, $teamNo, $outlineId, $exerciseNo, $themeId, $scenarioId)],
             'reflections'=> ['reflections' => $this->reflections->read($accessId, $teamNo, $outlineId, $exerciseNo)],
+            'specification'=> ['specification' => $this->specification->readAll($accessId, $teamNo, $outlineId, $exerciseNo, $themeId, $scenarioId)],
             default => throw new \InvalidArgumentException('Unknown form_key'),
         };
     }

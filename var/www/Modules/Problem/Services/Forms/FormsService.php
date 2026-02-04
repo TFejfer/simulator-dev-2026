@@ -17,6 +17,7 @@ use Modules\Problem\Repositories\Forms\ActionsRepository;
 use Modules\Problem\Repositories\Forms\IterationsRepository;
 use Modules\Problem\Repositories\Forms\DescriptionRepository;
 use Modules\Problem\Repositories\Forms\ReflectionsRepository;
+use Modules\Problem\Repositories\Forms\SpecificationRepository;
 use Modules\Problem\Repositories\WorkflowLogRepository;
 
 final class FormsService
@@ -31,6 +32,7 @@ final class FormsService
         private IterationsRepository $iterations,
         private DescriptionRepository $description,
         private ReflectionsRepository $reflections,
+        private SpecificationRepository $specification,
         private FormsPayloadBuilder $payloadBuilder,
         private WorkflowLogRepository $workflow,
     ) {}
@@ -348,8 +350,12 @@ final class FormsService
                         (int)($p['id'] ?? 0),
                         (string)($p['likelihood_text'] ?? ''),
                         (string)($p['evidence_text'] ?? ''),
-                        (int)($p['proven'] ?? 0),
-                        (int)($p['disproven'] ?? 0),
+                        (int)($p['is_proven'] ?? 0),
+                        (int)($p['is_disproven'] ?? 0),
+                        (string)($p['test_what'] ?? ''),
+                        (string)($p['test_where'] ?? ''),
+                        (string)($p['test_when'] ?? ''),
+                        (string)($p['test_extent'] ?? ''),
                         $req->actorToken
                     );
                     return;
@@ -478,6 +484,24 @@ final class FormsService
                     return;
                 }
                 break;
+
+            case 'specification':
+                if ($req->crud === 'upsert') {
+                    $field = (string)($p['field'] ?? '');
+                    $text = (string)($p['text'] ?? '');
+                    $this->specification->upsertOne(
+                        $req->accessId,
+                        $req->teamNo,
+                        $req->outlineId,
+                        $req->exerciseNo,
+                        $themeId,
+                        $scenarioId,
+                        $field,
+                        $text,
+                        $req->actorToken
+                    );
+                    return;
+                }
         }
 
         throw new \InvalidArgumentException('Invalid crud/form combination');

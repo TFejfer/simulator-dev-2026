@@ -1,17 +1,4 @@
-/* /var/www/common/assets/js/pages/training-instructor-problem-analysis.js
- *
- * Problem instructor analysis (minimal bring-up).
- *
- * Purpose:
- * - Prove page lifecycle works (blocking/render/bind)
- * - Show a visible placeholder in #problem_forms
- * - Load runtime state from /ajax/problem/exercise/state.php (optional for now)
- * - Prepare the ground for ProblemFormsLayout + ProblemFormsRegistry
- *
- * Notes:
- * - Uses SimulatorPage.run({ blocking, render, bind }) (hook-object signature).
- * - Does NOT require forms to be loaded globally; only this page needs them.
- */
+/* /var/www/common/assets/js/pages/training-instructor-problem-analysis.js */
 
 /* global $, SimulatorPage, simulatorAjaxRequest, simulatorCache */
 
@@ -28,6 +15,26 @@
 		console.error('[analysis] SimulatorPage is undefined (core js not loaded?)');
 		return;
 	}
+
+	// ------------------------------------------------------------
+	// 0) Helpers
+	// ------------------------------------------------------------
+
+	const waitForFormsReady = async () => {
+		// If bundle hasn't created the promise yet, wait a little for it to appear.
+		for (let i = 0; i < 40; i++) { // ~2s
+			if (window.__PROBLEM_FORMS_READY_PROMISE__) break;
+			await new Promise(r => setTimeout(r, 50));
+		}
+
+		if (window.__PROBLEM_FORMS_READY_PROMISE__) {
+			await window.__PROBLEM_FORMS_READY_PROMISE__;
+			return true;
+		}
+
+		// Fallback (should not happen): proceed without blocking forever
+		return false;
+	};
 
 	// ------------------------------------------------------------
 	// 1) Parse server-provided page data
@@ -47,7 +54,7 @@
 	if (!EXERCISE_META) console.error('[analysis] missing EXERCISE_META in page-data');
 	console.log('[analysis] EXERCISE_META', EXERCISE_META);
 
-	// Local runtime store payload
+	// Local runtime store payload (keep keys aligned with backend contract)
 	const EXERCISE_DATA = {
 		ui:{
 			team_no: Number(DELIVERY_META.team_no || 0),
@@ -62,7 +69,7 @@
 			format_id: Number(EXERCISE_META.format_id || 0),
 			step_no: Number(EXERCISE_META.step_no || 0),
 			current_state: Number(EXERCISE_META.current_state || 0),
-			next_state: Number(EXERCISE_META.next_state || 0),		
+			next_state: Number(EXERCISE_META.next_state || 0),
 			has_causality: Number(EXERCISE_META.has_causality || 0) === 1,
 			number_of_causes: Number(EXERCISE_META.number_of_causes || 0),
 			position_count: Number(EXERCISE_META.position_count || 0),
@@ -73,13 +80,15 @@
 		case: {
 			versions: {},
 			visibility: {},
+			forms_plan: [],
+			// Data payloads (match backend keys)
 			symptoms: [],
 			facts: [],
 			causes: [],
 			actions: [],
-			iteration: { text: '', },
+			iterations: [],
 			description: { short_description: '', long_description: '', work_notes: '', },
-			reflection: { keep_text: '', improve_text: '', },
+			reflections: { keep_text: '', improve_text: '', },
 			attachments: { id: 0, file_name: null, }
 		}
 	};
@@ -97,7 +106,6 @@
 	let exerciseStaticContent = null;
 	let exerciseStateContent = null;
 
-	// Make globals predictable for debugging (avoid undefined)
 	window.ProblemExerciseStaticContent = null;
 	window.ProblemExerciseStateContent = null;
 
@@ -163,26 +171,32 @@
 		const data = res.data || {};
 		const versions = data.versions || {};
 		const forms = data.forms || {};
+		const uiPlan = data?.case?.forms || null;
+
+		// Persist plan in store so render/bind can follow DB order
+		store.get().case.forms_plan = Array.isArray(uiPlan) ? uiPlan : [];
+
+		// 🔑 Build dynamic form containers in the DB-defined order
+		if (uiPlan && window.ProblemFormsLayout?.applyFormPlan) {
+			window.ProblemFormsLayout.applyFormPlan('#problem_forms', uiPlan);
+		}
 
 		// Versions
 		Object.keys(versions).forEach((k) => {
 			store.setVersion(k, versions[k]);
 		});
 
-		// Forms
+		// Forms (only set what exists)
 		if (forms.symptoms) store.get().case.symptoms = forms.symptoms;
 		if (forms.facts) store.get().case.facts = forms.facts;
 		if (forms.causes) store.get().case.causes = forms.causes;
 		if (forms.actions) store.get().case.actions = forms.actions;
 		if (forms.iterations) store.get().case.iterations = forms.iterations;
-		//if (forms.description) store.get().case.description = forms.description;
+		if (forms.description) store.get().case.description = forms.description;
 		if (forms.reflections) store.get().case.reflections = forms.reflections;
 		if (forms.attachments) store.get().case.attachments = forms.attachments;
 
-		// KT forms: concerns and specifications
-
-
-		// Visibility (optional – may be added later)
+		// Visibility (backwards compatible)
 		if (data.case && data.case.visibility) {
 			store.get().case.visibility = data.case.visibility;
 		}
@@ -191,15 +205,14 @@
 	};
 
 	// ------------------------------------------------------------
-	// 3) Page lifecycle (hook-object signature)
+	// 3) Page lifecycle
 	// ------------------------------------------------------------
 	SimulatorPage.run({
 		id: 'training-instructor-problem-analysis',
 
-		blocking: async (ctx) => {
+		blocking: async () => {
 			console.log('[analysis] blocking entered');
 
-			// Always create the mount skeleton
 			$('#display_content').html(`
 				<div id="problem_analysis_layout">
 					<div id="problem_instruction"></div>
@@ -208,14 +221,7 @@
 				</div>
 			`);
 
-			// Visible proof (placeholder)
-			$('#problem_forms').html(`
-				<div style="padding:12px;border:2px solid #0a0;">
-					FORMS PLACEHOLDER: layout mounted
-				</div>
-			`);
-
-			// Build store (forms-core must be loaded for this page)
+			// Build store
 			if (!window.simulatorFormsStore?.createStore) {
 				console.error('[analysis] simulatorFormsStore.createStore missing (forms store not loaded on this page)');
 				return;
@@ -224,45 +230,58 @@
 			store = window.simulatorFormsStore.createStore(EXERCISE_DATA);
 			window._debugStore = store;
 
-			// Optional: ensure containers (if the layout module is loaded)
+			// Ensure base container exists
 			if (window.ProblemFormsLayout?.ensureLayout) {
 				window.ProblemFormsLayout.ensureLayout('#problem_forms');
 			}
 
-			// Static exercise content is needed by forms (e.g., CI names); load before first render
+						// Static content first (needed for CI lookups etc.)
 			await loadExerciseStaticContent();
 
-			// Load runtime state once (safe even if forms registry isn't present yet)
+			// Render-throttle for incremental module arrivals (must be set BEFORE bundle finishes).
+			let renderTimer = null;
+			window.__PROBLEM_FORMS_ON_MODULE__ = () => {
+				// Skip early renders until the bundle finishes to avoid missing-module noise.
+				if (!window.__PROBLEM_FORMS_READY__) return;
+				if (renderTimer) return;
+				renderTimer = setTimeout(() => {
+					renderTimer = null;
+					const plan = Array.isArray(store.get().case.forms_plan) ? store.get().case.forms_plan : [];
+					if (plan.length && window.problemFormsRegistry?.renderPlan) {
+						window.problemFormsRegistry.renderPlan(store, plan);
+					}
+				}, 50);
+			};
+
+			// Load runtime state (builds plan + containers)
 			await refreshState();
-		},
 
-		render: (ctx) => {
-			// Chrome
-			if (window.TopBarEngine?.render) window.TopBarEngine.render();
-			if (window.MenuBarEngine?.render) window.MenuBarEngine.render();
+			// Wait for bundle completion before first render/bind to avoid missing-module errors.
+			await waitForFormsReady();
 
-			// If a forms registry is present, render all forms (placeholder modules)
-			if (store && window.ProblemFormsRegistry?.renderAll) {
-				window.ProblemFormsRegistry.renderAll(store);
+			const plan = Array.isArray(store.get().case.forms_plan) ? store.get().case.forms_plan : [];
+			if (plan.length && window.problemFormsRegistry?.renderPlan) {
+				window.problemFormsRegistry.renderPlan(store, plan);
+			}
+
+			if (plan.length && window.problemFormsRegistry?.bindPlan) {
+				window.problemFormsRegistry.bindPlan({ store, scope }, plan);
 			}
 		},
 
-		bind: (ctx) => {
-			// Bind common UI close buttons if available
+		render: () => {
+			if (window.TopBarEngine?.render) window.TopBarEngine.render();
+			if (window.MenuBarEngine?.render) window.MenuBarEngine.render();
+			// Do NOT render forms here; we render once after bundle is ready in blocking().
+		},
+
+		bind: () => {
 			if (window.HelpSidebar?.bindCloseButton) {
 				window.HelpSidebar.bindCloseButton();
 			}
-
-			// Bind placeholder form handlers (only if registry exists)
-			if (store && window.ProblemFormsRegistry?.bindAll) {
-				window.ProblemFormsRegistry.bindAll({
-					store,
-					scope
-				});
-			}
+			// Do NOT bind forms here; we bind once after bundle is ready in blocking().
 		},
 
-		// Background: remaining published exercise content (state) without blocking render
 		background: async () => {
 			try {
 				await loadExerciseStateContent();

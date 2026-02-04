@@ -2,12 +2,12 @@
 declare(strict_types=1);
 
 /**
- * /var/www/ajax/problem/forms/description.php
+ * /var/www/ajax/problem/forms/specification.php
  *
  * Dynamic endpoint (no cache).
  * CRUD:
  * - read
- * - upsert
+ * - upsert (single field)
  */
 
 require_once __DIR__ . '/../../_guard_dynamic.php';
@@ -38,13 +38,6 @@ try {
 	$expected = Request::int($in, 'expected_version', 0);
 	$payload = Request::arr($in, 'payload');
 
-	// Only allow the supported verbs for this endpoint
-	if (!in_array($crud, ['read', 'upsert'], true)) {
-		http_response_code(422);
-		echo json_encode(['ok' => false, 'data' => null, 'error' => 'Invalid crud'], JSON_UNESCAPED_UNICODE);
-		exit;
-	}
-
 	$service = FormsServiceFactory::make($dbRuntime);
 
 	$req = new FormRequest(
@@ -53,7 +46,7 @@ try {
 		$scope['outline_id'],
 		$scope['exercise_no'],
 		$token,
-		'description',
+		'specification',   // FORM KEY
 		$crud,
 		$expected,
 		$payload
@@ -66,6 +59,12 @@ try {
 			'version' => $res->version,
 			'data' => $res->data,
 		], 'error' => null], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+		exit;
+	}
+
+	if ($crud !== 'upsert') {
+		http_response_code(422);
+		echo json_encode(['ok' => false, 'data' => null, 'error' => 'Unsupported crud'], JSON_UNESCAPED_UNICODE);
 		exit;
 	}
 

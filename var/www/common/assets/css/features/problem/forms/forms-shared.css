@@ -37,3 +37,74 @@
 	justify-items: center;
 	align-items: center;	
 }
+
+/* ==================================== */
+/* ========== METHOD IN FORM ========== */
+/* ==================================== */
+
+.form-method[open] > :not(summary) {
+	background: #f6f8fb;
+	padding: 1.1em 1.2em 1.3em 1.2em;
+}
+
+#method-step,
+.method-step {
+	text-transform: none;
+	font-size: 1em;
+	letter-spacing: 0;
+	line-height: 1.65;
+}
+
+#method-step ul,
+.method-step ul,
+.method-step ol {
+	margin: 0;
+	padding-left: 1.35em;
+}
+
+#method-step li,
+.method-step li {
+	margin: 0.4em 0;
+	padding-left: 0.2em;
+}
+
+.method-question {
+	display: inline-block;
+	font-weight: 700;
+	letter-spacing: 0.05rem;
+	font-size: 1.05em;
+	color: #13253f;
+	margin-bottom: 0.25em;
+}
+
+.method-step ol {
+	list-style-type: lower-alpha;
+	letter-spacing: 0.01rem;
+}
+
+.method-step ol ul {
+	list-style-type: square;
+	margin-left: 0 !important;
+}
+
+.method-facts-table {
+	padding-left: 30px;	
+}
+
+.method-facts-table-content td {
+	font-size: 14px !important;
+	letter-spacing: .01rem;
+}
+
+.method-facts-labels {
+	background-color: #808080;
+	color: #ffffff;
+}
+
+.method-facts-center {
+	text-align: center;
+}
+
+.method-facts-post-text {
+	padding-left: 30px;
+}

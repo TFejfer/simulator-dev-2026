@@ -31,7 +31,8 @@ final class ExerciseMetaService
 	public function __construct(
 		private ExerciseRuntimeRepository $logExerciseRepo,
 		private ActiveParticipantRepository $participantRepo,
-		private ?ProblemScenarioMetaRepository $scenarioMetaRepo = null
+		private ?ProblemScenarioMetaRepository $scenarioMetaRepo = null,
+		private \Modules\Problem\Content\Repositories\ProblemExerciseParametersRepository|\Modules\Shared\Repositories\SharedExerciseParametersRepository|null $exerciseParamsRepo = null
 	) {}
 
 	/**
@@ -102,6 +103,14 @@ final class ExerciseMetaService
 
 		$_SESSION[self::SESSION_KEY] = $meta->toArray();
 
+		// Attach shared exercise parameters (e.g., problem_discovery_time) into session cache for consumers.
+		if ($this->exerciseParamsRepo && method_exists($this->exerciseParamsRepo, 'getValue')) {
+			$discovery = $this->exerciseParamsRepo->getValue('problem_discovery_time');
+			if ($discovery !== null) {
+				$_SESSION[self::SESSION_KEY]['problem_discovery_time'] = $discovery;
+			}
+		}
+
 		return $meta;
 	}
 
@@ -152,6 +161,14 @@ final class ExerciseMetaService
 				$cached['has_causality'] = isset($scenarioMeta['has_causality'])
 					? ((int)$scenarioMeta['has_causality'] === 1)
 					: false;
+			}
+
+			// Ensure problem_discovery_time is present when cached meta is reused.
+			if (!array_key_exists('problem_discovery_time', $cached) && $this->exerciseParamsRepo && method_exists($this->exerciseParamsRepo, 'getValue')) {
+				$discovery = $this->exerciseParamsRepo->getValue('problem_discovery_time');
+				if ($discovery !== null) {
+					$cached['problem_discovery_time'] = $discovery;
+				}
 			}
 
 			$_SESSION[self::SESSION_KEY] = $cached;

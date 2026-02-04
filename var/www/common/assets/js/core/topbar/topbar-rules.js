@@ -67,13 +67,15 @@
 		return out;
 	};
 
-	// Override timer mode based on format_no (you already know: 4/9/11 => countdown)
+	// Override timer mode based on format_no (formats 1/10/11 use countdown when inputs are present)
 	const applyTimerRules = (ctx, layout) => {
 		const out = JSON.parse(JSON.stringify(layout));
 		if (!isExercisePage(ctx)) return out;
 
 		const f = Number(ctx.format_no || 0);
-		if ([4, 9, 11].includes(f)) {
+		const hasCountdownInputs = Number(ctx.deadline_unix || 0) > 0 || Number(ctx.seconds_left || 0) > 0;
+
+		if ([1, 10, 11].includes(f) && hasCountdownInputs) {
 			out.areas.a4 = 'timerCountDown';
 			out.timer = { mode: 'countdown' };
 		} else {

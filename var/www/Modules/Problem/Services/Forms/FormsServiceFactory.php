@@ -12,6 +12,7 @@ use Modules\Problem\Repositories\Forms\ActionsRepository;
 use Modules\Problem\Repositories\Forms\IterationsRepository;
 use Modules\Problem\Repositories\Forms\DescriptionRepository;
 use Modules\Problem\Repositories\Forms\ReflectionsRepository;
+use Modules\Problem\Repositories\Forms\SpecificationRepository;
 
 final class FormsServiceFactory
 {
@@ -31,6 +32,8 @@ final class FormsServiceFactory
 		$iterations = new IterationsRepository($dbRuntime);
 		$description = new DescriptionRepository($dbRuntime);
 		$reflections = new ReflectionsRepository($dbRuntime);
+		
+		$specification = new SpecificationRepository($dbRuntime);
 
 		$workflow = new \Modules\Problem\Repositories\WorkflowLogRepository($dbRuntime);
 
@@ -41,7 +44,8 @@ final class FormsServiceFactory
 			$actions,
 			$iterations,
 			$description,
-			$reflections
+			$reflections,
+			$specification
 		);
 
 		return new FormsService(
@@ -54,6 +58,7 @@ final class FormsServiceFactory
 			$iterations,
 			$description,
 			$reflections,
+			$specification,
 			$payloadBuilder,
 			$workflow
 		);

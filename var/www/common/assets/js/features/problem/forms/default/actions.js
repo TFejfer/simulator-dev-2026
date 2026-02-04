@@ -1,4 +1,4 @@
-/* actions.js
+/* /common/assets/js/features/problem/forms/default/actions.js
  *
  * UI parity with legacy:
  * - Method block (details/summary)
@@ -15,55 +15,64 @@
  * - action_id (smallint)
  * - effect_text (text)
  *
- * Modes (case.visibility.actions):
- * 0 hidden, 1 enabled, 2 limited, 3 disabled
+ * Optimal module contract:
+ * - export default { render(store, view), bind(ctx, view) }
+ * - view.root_id: container selector (e.g. '#display_actions')
+ * - view.mode: numeric mode (1 enabled, 2 limited, 3 disabled)
  *
  * Server writes via:
- * ProblemFormsController.writeForm('actions', crud, payload, store, scope)
+ * - ProblemFormsController.writeForm('actions', crud, payload, store, scope)
+ *
+ * Notes:
+ * - This module does NOT self-register. Registration happens in the template bundle.
+ * - Event handlers are delegated and namespaced to avoid duplicate bindings.
+ * - All writes go through ProblemFormsHelpers.safeWrite() for consistent feedback + rollback.
  */
 
 /* global $, simulatorShowConfirm, showSimulatorModal, hideSimulatorModal */
 
-(() => {
+const ActionsForm = (() => {
 	'use strict';
 
+	const H = window.ProblemFormsHelpers;
+
 	const FORM_KEY = 'actions';
-	const CONTAINER = `#display_${FORM_KEY}`;
+	const EVENT_NS = '.problem_actions';
 
 	// ---------------------------------
 	// Term helpers (SIM_SHARED maps)
 	// ---------------------------------
-	const tMap = (bucket, id, fallback = '') => {
-		const src = window.SIM_SHARED?.[bucket];
-		if (!src || typeof src !== 'object') return fallback;
-		const v = src[String(id)];
-		return (typeof v === 'string' && v !== '') ? v : fallback;
-	};
-
-	const Common = (id, fallback = '') => tMap('common_terms', id, fallback);
-	const Problem = (id, fallback = '') => tMap('problem_terms', id, fallback);
-	const Method = (id, fallback = '') => tMap('troubleshooting_methods', id, fallback);
+	const Common = (id, fallback = '') => H.tMap('common_terms', id, fallback);
+	const Problem = (id, fallback = '') => H.tMap('problem_terms', id, fallback);
+	const Method = (id, fallback = '') => H.tMap('troubleshooting_methods', id, fallback);
 
 	// ---------------------------------
 	// Store helpers
 	// ---------------------------------
-	const getMode = (store) => store.get().case?.visibility?.[FORM_KEY] ?? 0;
-	const editable = (mode) => mode === 1;
-
-	const getThemeId = (store) => store.get().meta?.theme_id ?? store.get().meta?.exercise?.theme_id ?? 0;
+	const getThemeId = (store) => {
+		const d = store.get();
+		return d?.meta?.theme_id ?? d?.meta?.exercise?.theme_id ?? 0;
+	};
 
 	const getActions = (store) => {
 		const arr = store.get().case?.actions;
 		return Array.isArray(arr) ? arr : [];
 	};
 
-	const esc = (s) => {
-		return String(s ?? '')
-			.replaceAll('&', '&amp;')
-			.replaceAll('<', '&lt;')
-			.replaceAll('>', '&gt;')
-			.replaceAll('"', '&quot;')
-			.replaceAll("'", '&#039;');
+	/**
+	 * Resolve endpoint scope (outline_id/exercise_no/theme_id/scenario_id).
+	 * Uses ctx.scope first, with store meta as fallback.
+	 */
+	const resolveScope = (store, scope) => {
+		const meta = store?.get?.().meta || {};
+		const metaExercise = meta.exercise || {};
+
+		return {
+			outline_id: Number(scope?.outline_id ?? meta.outline_id ?? metaExercise.outline_id ?? 0),
+			exercise_no: Number(scope?.exercise_no ?? meta.exercise_no ?? metaExercise.exercise_no ?? 0),
+			theme_id: Number(scope?.theme_id ?? meta.theme_id ?? metaExercise.theme_id ?? 0),
+			scenario_id: Number(scope?.scenario_id ?? meta.scenario_id ?? metaExercise.scenario_id ?? 0)
+		};
 	};
 
 	// ---------------------------------
@@ -110,7 +119,11 @@
 		return String(ciId);
 	};
 
-	const actionsCatalogRaw = () => window.SIM_SHARED?.ci_actions || window.SIM_SHARED?.cis_actions || window.SIM_SHARED?.actions_catalog || window.SIM_SHARED?.problem_actions || null;
+	const actionsCatalogRaw = () => window.SIM_SHARED?.ci_actions
+		|| window.SIM_SHARED?.cis_actions
+		|| window.SIM_SHARED?.actions_catalog
+		|| window.SIM_SHARED?.problem_actions
+		|| null;
 
 	const actionText = (actionId) => {
 		const raw = actionsCatalogRaw();
@@ -130,12 +143,10 @@
 		return String(actionId);
 	};
 
-	// Mapping: CI type -> allowed actions (legacy). Prefer explicit list on CI row.
-	// Supported shapes:
-	// - CI row: { actions:[2,16] }
-	// - array rows: [{ ci_type_id, action_id }, ...]
-	// - map: { "10":[1,2], "20":[3], ... }
-	const ciActionsMapRaw = () => window.SIM_SHARED?.cis_actions_mapping || window.SIM_SHARED?.ci_actions_mapping || null;
+	// Mapping: CI type -> allowed actions. Prefer explicit list on CI row.
+	const ciActionsMapRaw = () => window.SIM_SHARED?.cis_actions_mapping
+		|| window.SIM_SHARED?.ci_actions_mapping
+		|| null;
 
 	const ciTypeFromCiId = (ciId) => {
 		// Legacy rule: first 2 chars are type digits (e.g. "50A" -> 50)
@@ -174,48 +185,51 @@
 	};
 
 	// ---------------------------------
-	// Restore method (actions) – placeholder note
-	// Replace with full legacy restore method if needed.
+	// Restore method (actions)
 	// ---------------------------------
 	const renderRestoreMethod = () => `
-		<div id="met_step4">
-            <ul>
-                <li>
-                    <span class="method-question">${Method(35)}</span>
-                    <ul>
-                        <li><span>${Method(36)}</span></li>
-                        <li><span>${Method(37)}</span></li>
-                    </ul>
-                </li>
-                <li>
-                    <span class="method-question">${Method(43)}</span>
-                    <ul>
-                        <li><span>${Method(40)}</span></li>
-                    </ul>
-                </li>
-            </ul>
-        </div>
+		<div class="method-step">
+			<ul>
+				<li>
+					<span class="method-question">${Method(35)}</span>
+					<ul>
+						<li>${Method(36)}</li>
+						<li>${Method(37)}</li>
+					</ul>
+				</li>
+				<li>
+					<span class="method-question">${Method(43)}</span>
+					<ul>
+						<li>${Method(40)}</li>
+					</ul>
+				</li>
+			</ul>
+		</div>
+	`;
+
+	// ---------------------------------
+	// Render helpers
+	// ---------------------------------
+	const buildFieldset = (id, label, content, canEdit) => `
+		<fieldset class="${canEdit ? 'action-update-modal clickable case-field' : 'case-field-readonly'}" data-id="${id}">
+			<legend class="case-label">${H.esc(label)}</legend>
+			<div class="${canEdit ? 'case-item-clickable' : 'case-item'}" contenteditable="false">${H.esc(content)}</div>
+		</fieldset>
 	`;
 
 	// ---------------------------------
 	// Render
 	// ---------------------------------
-	const buildFieldset = (id, label, content, canEdit) => `
-		<fieldset class="${canEdit ? 'action-update-modal clickable case-field' : 'case-field-readonly'}" data-id="${id}">
-			<legend class="case-label">${esc(label)}</legend>
-			<div class="${canEdit ? 'case-item-clickable' : 'case-item'}" contenteditable="false">${esc(content)}</div>
-		</fieldset>
-	`;
+	const render = (store, view) => {
+		const mode = Number(view?.mode ?? 0);
+		const rootId = String(view?.root_id || `#display_${FORM_KEY}`);
 
-	const render = (store) => {
-		const mode = getMode(store);
-
-		if (mode === 0) {
-			$(CONTAINER).empty();
+		if (!H.isVisible(mode)) {
+			$(rootId).empty();
 			return;
 		}
 
-		const canEdit = editable(mode);
+		const canEdit = H.isEditable(mode);
 		const rows = getActions(store);
 
 		let listHtml = '';
@@ -225,7 +239,9 @@
 
 				const ciId = String(a.ci_id ?? a.ciID ?? '');
 				const actId = parseInt(a.action_id ?? a.actionID ?? 0, 10) || 0;
-				const effect = String(a.effect_text ?? a.effect ?? '').replace(/\\/g, '');
+
+				// Preserve legitimate backslashes (e.g. file paths); normalize only double-escaped.
+				const effect = H.normalizeDbText(a.effect_text ?? a.effect ?? '');
 
 				const actionLine = `${ciName(ciId)} - ${actionText(actId)}`;
 
@@ -237,14 +253,14 @@
 		}
 
 		const addBtn = (canEdit && rows.length < 50)
-			? `<span id="action_insert_modal" class="clickable link-text">${esc(Problem(45, 'Add action'))}</span>`
+			? `<span id="action_insert_modal" class="clickable link-text">${H.esc(Problem(45, 'Add action'))}</span>`
 			: (canEdit && rows.length >= 50)
-				? `<span class="form-text-limit">${esc(Problem(14, 'Limit reached'))}</span>`
+				? `<span class="form-text-limit">${H.esc(Problem(14, 'Limit reached'))}</span>`
 				: '';
 
-		$(CONTAINER).html(`
+		$(rootId).html(`
 			<details class="form-method">
-				<summary class="form-step-header">4. ${esc(Problem(12, 'Actions'))}</summary>
+				<summary class="form-step-header">4. ${H.esc(Problem(12, 'Actions'))}</summary>
 				${renderRestoreMethod()}
 			</details>
 
@@ -261,28 +277,32 @@
 	// ---------------------------------
 	// Modal builders
 	// ---------------------------------
-	const buildCiSelect = (themeId, locked) => {
+	const buildCiSelect = (locked) => {
 		const raw = cisRaw();
 		let options = '';
 
 		if (Array.isArray(raw)) {
-			// best effort: if your CI rows include theme flags, filter here later
-			const rows = raw.slice().sort((a, b) => String(a?.name ?? a?.text_value ?? a?.ci_text ?? '').localeCompare(String(b?.name ?? b?.text_value ?? b?.ci_text ?? '')));
+			const rows = raw.slice().sort((a, b) =>
+				String(a?.name ?? a?.text_value ?? a?.ci_text ?? '').localeCompare(
+					String(b?.name ?? b?.text_value ?? b?.ci_text ?? '')
+				)
+			);
+
 			options = rows.map((r) => {
 				const id = String(r.id ?? r.ci_id ?? '');
 				const name = String(r.name ?? r.text_value ?? r.ci_text ?? id);
-				return `<option value="${esc(id)}">${esc(name)}</option>`;
+				return `<option value="${H.esc(id)}">${H.esc(name)}</option>`;
 			}).join('');
 		} else if (raw && typeof raw === 'object') {
 			options = Object.entries(raw).map(([id, v]) => {
 				const name = (typeof v === 'string') ? v : String(v?.name ?? v?.text_value ?? v?.ci_text ?? id);
-				return `<option value="${esc(id)}">${esc(name)}</option>`;
+				return `<option value="${H.esc(id)}">${H.esc(name)}</option>`;
 			}).join('');
 		}
 
 		return `
 			<select name="ciSelect" class="form-control" id="ciSelect" ${locked ? 'disabled' : 'required'}>
-				<option value="0">-- ${esc(Problem(21, 'Select item'))} --</option>
+				<option value="0">-- ${H.esc(Problem(21, 'Select item'))} --</option>
 				${options}
 			</select>
 		`;
@@ -291,15 +311,15 @@
 	const buildActionSelect = (ciId, locked, selectedId = 0) => {
 		const allowed = allowedActionIdsForCi(ciId);
 
-		let options = `<option value="0">-- ${esc(Problem(76, 'Select action'))} --</option>`;
+		let options = `<option value="0">-- ${H.esc(Problem(76, 'Select action'))} --</option>`;
 
 		if (allowed.length) {
-			options += allowed.map((id) => `<option value="${id}">${esc(actionText(id))}</option>`).join('');
+			options += allowed.map((id) => `<option value="${id}">${H.esc(actionText(id))}</option>`).join('');
 		}
 
 		// Preserve selection even if mapping changed
 		if (selectedId > 0 && !allowed.includes(selectedId)) {
-			options += `<option value="${selectedId}">${esc(actionText(selectedId))}</option>`;
+			options += `<option value="${selectedId}">${H.esc(actionText(selectedId))}</option>`;
 		}
 
 		return `
@@ -309,16 +329,14 @@
 		`;
 	};
 
-	const modalHtml = (store, id, locked, selectedActionId = 0) => {
-		const themeId = getThemeId(store);
-
+	const modalHtml = (id, locked, ciId, selectedActionId = 0) => {
 		return `
 			<div class="grid-modal-action">
-				<div class="ma-cis">${buildCiSelect(themeId, locked)}</div>
-				<div class="ma-action">${buildActionSelect('00O', locked, selectedActionId)}</div>
+				<div class="ma-cis">${buildCiSelect(locked)}</div>
+				<div class="ma-action">${buildActionSelect(ciId, locked, selectedActionId)}</div>
 
 				<fieldset class="ma-effect case-field">
-					<legend class="case-label">${esc(Problem(73, 'Effect'))}</legend>
+					<legend class="case-label">${H.esc(Problem(73, 'Effect'))}</legend>
 					<div class="action case-edit" data-id="${id}" data-field="effect" contenteditable></div>
 				</fieldset>
 			</div>
@@ -332,28 +350,37 @@
 			<div class="grid-buttons-modal">
 				<div></div>
 				<div>${id === 0 ? '' : deleteBtn}</div>
-				<div class="std-btn std-btn-enabled upsert-action" data-id="${id}">${esc(Common(287, 'Save'))}</div>
+				<div class="std-btn std-btn-enabled upsert-action" data-id="${id}">${H.esc(Common(287, 'Save'))}</div>
 			</div>
 		`;
 	};
 
 	// ---------------------------------
-	// Events
+	// Bind (idempotent, plan-driven)
 	// ---------------------------------
-	const bind = ({ store, scope }) => {
-		// Open create modal
-		$(document).on('click', '#action_insert_modal', () => {
-			if (!editable(getMode(store))) return;
+	const bind = (ctx, view) => {
+		const store = ctx.store;
+		const scope = ctx.scope;
 
-			$('#simulator_modal_title').html(esc(Problem(16, 'Action')));
-			$('#simulator_modal_body').html(modalHtml(store, 0, false, 0));
+		const mode = Number(view?.mode ?? 0);
+		if (!H.isEditable(mode)) {
+			return;
+		}
+
+		// Ensure we do not duplicate event handlers across rebinds.
+		$(document).off(EVENT_NS);
+
+		// Open create modal
+		$(document).on(`click${EVENT_NS}`, '#action_insert_modal', () => {
+			$('#simulator_modal_title').html(H.esc(Problem(16, 'Action')));
+			$('#simulator_modal_body').html(modalHtml(0, false, '00O', 0));
 			$('#simulator_modal_footer').html(modalFooter(0));
 
 			showSimulatorModal('simulator_modal_common');
 		});
 
 		// Update action select when CI changes (create modal)
-		$(document).on('change', '#ciSelect', function () {
+		$(document).on(`change${EVENT_NS}`, '#ciSelect', function () {
 			const ciId = String($('#ciSelect option:selected').val() || '00O');
 			if (ciId === '00O' || ciId === '0') return;
 
@@ -361,9 +388,7 @@
 		});
 
 		// Open edit modal
-		$(document).on('click', '.action-update-modal', function () {
-			if (!editable(getMode(store))) return;
-
+		$(document).on(`click${EVENT_NS}`, '.action-update-modal', function () {
 			const id = parseInt(String($(this).attr('data-id') || '0'), 10) || 0;
 			if (!id) return;
 
@@ -373,10 +398,10 @@
 
 			const ciId = String(row.ci_id ?? row.ciID ?? '');
 			const actionId = parseInt(row.action_id ?? row.actionID ?? 0, 10) || 0;
-			const effect = String(row.effect_text ?? row.effect ?? '');
+			const effect = H.normalizeDbText(row.effect_text ?? row.effect ?? '');
 
-			$('#simulator_modal_title').html(esc(Problem(16, 'Action')));
-			$('#simulator_modal_body').html(modalHtml(store, id, true, actionId));
+			$('#simulator_modal_title').html(H.esc(Problem(16, 'Action')));
+			$('#simulator_modal_body').html(modalHtml(id, true, ciId, actionId));
 			$('#simulator_modal_footer').html(modalFooter(id));
 
 			$('#ciSelect').val(ciId);
@@ -388,11 +413,9 @@
 		});
 
 		// Create or update action (double-click protection)
-		$(document).on('click', '.upsert-action.std-btn-enabled', async function (e) {
+		$(document).on(`click${EVENT_NS}`, '.upsert-action.std-btn-enabled', async function (e) {
 			e.preventDefault();
 			e.stopImmediatePropagation();
-
-			if (!editable(getMode(store))) return;
 
 			const $btn = $(this);
 			if ($btn.data('clicked')) return;
@@ -418,6 +441,7 @@
 					content: Problem(87, 'Select item and action first.'),
 					backgroundDismiss: true
 				});
+
 				$btn
 					.removeClass('std-btn-disabled')
 					.addClass('std-btn-enabled')
@@ -437,19 +461,21 @@
 			};
 
 			const crud = id > 0 ? 'update' : 'create';
+			const endpointScope = resolveScope(store, scope);
 
-			const res = await window.ProblemFormsController.writeForm(FORM_KEY, crud, payload, store, scope);
+			const res = await H.safeWrite(
+				store,
+				() => window.ProblemFormsController.writeForm(FORM_KEY, crud, payload, store, endpointScope),
+				'Save failed. Please try again.'
+			);
+			if (!res) return;
+
 			hideSimulatorModal('simulator_modal_common');
-
-			if (!res?.ok) console.warn('[actions] upsert failed', res);
-
-			render(store);
+			H.renderPlan(store);
 		});
 
 		// Delete action
-		$(document).on('click', '.delete-action', function () {
-			if (!editable(getMode(store))) return;
-
+		$(document).on(`click${EVENT_NS}`, '.delete-action', function () {
 			const id = parseInt(String($(this).attr('data-id') || '0'), 10) || 0;
 			if (!id) return;
 
@@ -462,10 +488,17 @@
 					ok: {
 						text: Common(223, 'OK'),
 						action: async () => {
-							const res = await window.ProblemFormsController.writeForm(FORM_KEY, 'delete', { id }, store, scope);
+							const endpointScope = resolveScope(store, scope);
+
+							const res = await H.safeWrite(
+								store,
+								() => window.ProblemFormsController.writeForm(FORM_KEY, 'delete', { id }, store, endpointScope),
+								'Delete failed. Please try again.'
+							);
+							if (!res) return;
+
 							hideSimulatorModal('simulator_modal_common');
-							if (!res?.ok) console.warn('[actions] delete failed', res);
-							render(store);
+							H.renderPlan(store);
 						}
 					},
 					cancel: {
@@ -477,9 +510,7 @@
 		});
 	};
 
-	// Expose (optional)
-	window.ProblemFormActions = { render, bind };
-
-	// Register
-	window.ProblemFormsRegistry.register({ key: FORM_KEY, render, bind });
+	return { render, bind };
 })();
+
+export default ActionsForm;

@@ -32,26 +32,36 @@ if (empty($uid) || !is_array($deliveryMeta) || $sessionToken === '') {
 
 // ------------------------------------------------------------
 // 2) Resolve scope + build exercise meta (DB truth)
-// NOTE:
-// - access_id / team_no must exist and be > 0
-// - token comes from session, not from delivery_meta
 // ------------------------------------------------------------
 $accessId = (int)($deliveryMeta['access_id'] ?? 0);
-$teamNo = (int)($deliveryMeta['team_no'] ?? 0);
+$teamNo   = (int)($deliveryMeta['team_no'] ?? 0);
 
 if ($accessId <= 0 || $teamNo <= 0) {
-	// No valid team scope yet -> outline/setup is the correct place
 	header('Location: /training-instructor-outline');
 	exit;
 }
 
 try {
-	// This call writes exercise_meta into $_SESSION['exercise_meta'] and returns the DTO
 	$exerciseMeta = $exerciseMetaService->loadIntoSession($accessId, $teamNo, $sessionToken);
+	$exerciseMetaArr = $exerciseMeta->toArray();
 } catch (Throwable) {
-	// If no log_exercise exists yet (or any runtime error), redirect back to outline
 	header('Location: /training-instructor-outline');
 	exit;
+}
+
+$serverNow = time();
+$exerciseStartUnix = strtotime($exerciseMeta->createdAtIso ?? '') ?: 0;
+$deadlineUnix = (int)($exerciseMetaArr['deadline_unix'] ?? 0);
+$secondsLeft = (int)($exerciseMetaArr['seconds_left'] ?? 0);
+
+// Fallback: derive discovery countdown from shared/problem parameter when missing.
+if (in_array((int)($exerciseMetaArr['format_id'] ?? 0), [1, 10, 11], true)
+	&& $deadlineUnix <= 0 && $secondsLeft <= 0 && $exerciseStartUnix > 0) {
+	$discoverySeconds = (int)($_SESSION['exercise_meta']['problem_discovery_time'] ?? $_SESSION['exercise_meta']['discovery_time'] ?? 1500);
+	if ($discoverySeconds > 0) {
+		$deadlineUnix = $exerciseStartUnix + $discoverySeconds;
+		$secondsLeft = max(0, $deadlineUnix - $serverNow);
+	}
 }
 
 // Release session lock early (critical for parallel AJAX)
@@ -71,15 +81,17 @@ require_once INSTALL_ROOT . 'App/Context/requirements.php';
 require_once INSTALL_ROOT . 'App/Context/assets.php';
 
 // ------------------------------------------------------------
-// 5) Page context
+// 5) Page context (template-aware)
 // ------------------------------------------------------------
+$templateCode = (string)($deliveryMeta['template_code'] ?? 'default');
+
 $pageContext = \App\Context\normalize_context([
-	'site'		=> 'training',
-	'pace'		=> 'instructor',
-	'skill'		=> 'problem',
-	'template'	=> null,
-	'page'		=> 'analysis',
-	'specific'	=> null,
+	'site'     => 'training',
+	'pace'     => 'instructor',
+	'skill'    => 'problem',
+	'template' => $templateCode,
+	'page'     => 'analysis',
+	'specific' => null,
 ]);
 \App\Context\require_context($pageContext);
 
@@ -88,27 +100,24 @@ $pageContext = \App\Context\normalize_context([
 // ------------------------------------------------------------
 $assets = \App\Context\resolve_assets($pageContext);
 
-// Add feature scripts as you build them
-// $assets['js'][] = '/common/assets/js/features/sidebar/help-sidebar.js';
-
-$ctxKey = \App\Context\ctx_key($pageContext); // expected: training-problem-instructor-analysis
+$ctxKey = \App\Context\ctx_key($pageContext);
 $_SERVER['APP_PAGE_KEY'] = $ctxKey;
 
 $pageScript = "/common/assets/js/pages/{$ctxKey}.js";
 
-// Page specific js script
-// Forms - core
+// Forms - core (always)
+$assets['js'][] = '/common/assets/js/features/problem/forms/helpers.js';
 $assets['js'][] = '/common/assets/js/features/problem/forms/store.js';
 $assets['js'][] = '/common/assets/js/features/problem/forms/forms-controller.js';
-// Forms - orchestration
-$assets['js'][] = '/common/assets/js/features/problem/forms/forms-registry.js';
 $assets['js'][] = '/common/assets/js/features/problem/forms/forms-layout.js';
-// Forms - concrete
-$assets['js'][] = '/common/assets/js/features/problem/forms/symptoms.js';
-$assets['js'][] = '/common/assets/js/features/problem/forms/facts.js';
-$assets['js'][] = '/common/assets/js/features/problem/forms/causes.js';
-$assets['js'][] = '/common/assets/js/features/problem/forms/actions.js';
-$assets['js'][] = '/common/assets/js/features/problem/forms/iterations.js';
+$assets['js'][] = '/common/assets/js/features/problem/forms/forms-registry.js';
+
+// Forms - template bundle (single entrypoint)
+// NOTE: This file should register the concrete forms for the chosen template.
+//$assets['js'][] = "/common/assets/js/features/problem/forms/{$templateCode}/_bundle.js";
+
+// (Optional) template CSS (if you implement it)
+//$assets['css'][] = "/common/assets/css/features/problem/forms/{$templateCode}.css";
 
 // ------------------------------------------------------------
 // 7) Page class
@@ -121,40 +130,72 @@ $pageObj = new \App\Pages\Training\Instructor\ProblemAnalysisPage();
 
 // ------------------------------------------------------------
 // 8) Render
-// NOTE: $nonce and $view are expected by your header/footer layout.
 // ------------------------------------------------------------
 $view = [
-	'assets'		=> $assets,
-	'pageScript'	=> $pageScript,
-	'ctxKey'		=> $ctxKey,
+	'assets'     => $assets,
+	'pageScript' => $pageScript,
+	'ctxKey'     => $ctxKey,
 ];
 
 include INSTALL_ROOT . 'App/View/Layout/header.php';
 
 echo $pageObj->getPage();
 ?>
+
 <script id="page-data" type="application/json" nonce="<?php echo $nonce ?? ''; ?>">
 <?php
-echo json_encode([
-	'DEBUG'		=> !empty($_GET['debug']),
-	'CTX_KEY'	=> $ctxKey,
-	'DATA'		=> array_merge($pageObj->getPageData(), [
-		// Expose both for debugging / transparency
-		'DELIVERY_META' => [
-			'team_no'	=> $deliveryMeta['team_no'] ?? 0,
-			'language_code' => $deliveryMeta['language_code'] ?? 'en',
-		],
-		'EXERCISE_META' => $exerciseMeta->toArray(),
+// Enrich exercise meta for topbar timers (format + timer inputs)
+$formatNo = (int)($exerciseMetaArr['format_id'] ?? 0);
 
-		// Optional: minimal session debug (do NOT expose secrets)
-		'SESSION_DEBUG' => [
-			'user_id'	=> $uid,
-			'access_id'	=> $accessId,
-			'token'		=> ($sessionToken !== '') ? 'set' : 'missing',
+$pageData = $pageObj->getPageData();
+$pageData['DELIVERY'] = array_merge($pageData['DELIVERY'] ?? [], [
+	'serverTimeNow'  => $serverNow,
+	'server_now_unix'=> $serverNow,
+]);
+
+echo json_encode([
+	'DEBUG'   => !empty($_GET['debug']),
+	'CTX_KEY' => $ctxKey,
+	'DATA'    => array_merge($pageData, [
+		'DELIVERY_META' => [
+			'serverTimeNow' => $serverNow,
+			'team_no'        => $deliveryMeta['team_no'] ?? 0,
+			'language_code'  => $deliveryMeta['language_code'] ?? 'en',
+			'template_id'    => (int)($deliveryMeta['template_id'] ?? 0),
+			'template_code'  => (string)($deliveryMeta['template_code'] ?? 'default'),
+			'is_frontline'   => (int)($deliveryMeta['is_frontline'] ?? 0),
 		],
+		'EXERCISE_META' => array_merge($exerciseMetaArr, [
+			// TopBarRules expects format_no/format; mirror format_id so countdown rules can trigger
+			'format_no' => $formatNo,
+			'format'    => $formatNo,
+			// Timer inputs
+			'exercise_start_unix' => $exerciseStartUnix,
+			'deadline_unix' => $deadlineUnix,
+			'seconds_left' => $secondsLeft,
+		]),
 	]),
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 ?>
 </script>
+
 <?php
+// One stable asset version per request.
+// Use this for both __ASSET_VER__ and the module bundle URL.
+$assetVer = (string)time();
+
 include INSTALL_ROOT . 'App/View/Layout/footer.php';
+
+$templateCode = (string)($deliveryMeta['template_code'] ?? 'default');
+?>
+
+<script nonce="<?php echo $nonce ?? ''; ?>">
+	window.__ASSET_VER__ = "<?php echo $assetVer; ?>";
+</script>
+
+<script
+	type="module"
+	src="/common/assets/js/features/problem/forms/<?php echo htmlspecialchars($templateCode, ENT_QUOTES, 'UTF-8'); ?>/_bundle.js?v=<?php echo $assetVer; ?>">
+</script>
+
+<?php

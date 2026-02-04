@@ -59,7 +59,7 @@ final class ReflectionsRepository
 		int $exerciseNo,
 		string $keepText,
 		string $improveText,
-		?string $actorToken
+		string $actorToken
 	): void {
 		$stmt = $this->db->prepare("
 			INSERT INTO problem_form_reflections (

@@ -5,6 +5,7 @@ namespace Modules\Shared\Services\SharedContent\Builders;
 
 use Modules\Shared\Contracts\PayloadBuilderInterface;
 use Modules\Shared\Repositories\SharedContentTextsRepository;
+use Modules\Shared\Repositories\SharedExerciseParametersRepository;
 
 /**
  * SharedContentPayloadBuilder
@@ -19,7 +20,10 @@ use Modules\Shared\Repositories\SharedContentTextsRepository;
  */
 final class SharedContentPayloadBuilder implements PayloadBuilderInterface
 {
-    public function __construct(private SharedContentTextsRepository $repo) {}
+    public function __construct(
+        private SharedContentTextsRepository $repo,
+        private ?SharedExerciseParametersRepository $exerciseParamsRepo = null
+    ) {}
 
     public function build(array $ctx): array
     {
@@ -30,7 +34,7 @@ final class SharedContentPayloadBuilder implements PayloadBuilderInterface
 
         $schemaVersion = (int)($ctx['schema_version'] ?? 1);
 
-        return [
+        $payload = [
             'schema_version' => $schemaVersion,
             'bucket' => 'shared_content',
             'language_code' => $lang,
@@ -97,7 +101,13 @@ final class SharedContentPayloadBuilder implements PayloadBuilderInterface
             'rca_terms' => $this->repo->rowsToMap(
                 $this->repo->readRcaTermsRows($lang)
             ),
-
         ];
+
+        // Static exercise parameters (language-agnostic)
+        if ($this->exerciseParamsRepo) {
+            $payload['exercise_parameters'] = $this->exerciseParamsRepo->readAll();
+        }
+
+        return $payload;
     }
 }

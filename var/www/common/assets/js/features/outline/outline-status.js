@@ -25,7 +25,7 @@
 	};
 
 	window.OutlineStatus = Object.freeze({
-		async refresh(pollCtx) {
+		async refresh(pollCtx, attempt = 1) {
 			if (!window.OutlineUI || typeof window.OutlineUI.applyStatusUpdate !== 'function') {
 				window.PollingDebug?.log('outline.status.missing_outline_ui', {}, 'info');
 				return;
@@ -39,13 +39,15 @@
 			);
 
 			if (!res.ok) {
-				window.PollingDebug?.log('outline.status.fetch_error', { error: res.error, status: res.status }, 'info');
+				window.PollingDebug?.log('outline.status.fetch_error', { error: res.error, status: res.status, attempt }, 'info');
+				if (attempt < 3) setTimeout(() => window.OutlineStatus.refresh(pollCtx, attempt + 1), 1500);
 				return;
 			}
 
 			const payload = res.data;
 			if (!payload || typeof payload !== 'object') {
-				window.PollingDebug?.log('outline.status.bad_payload', { payloadType: typeof payload }, 'info');
+				window.PollingDebug?.log('outline.status.bad_payload', { payloadType: typeof payload, attempt }, 'info');
+				if (attempt < 3) setTimeout(() => window.OutlineStatus.refresh(pollCtx, attempt + 1), 1500);
 				return;
 			}
 

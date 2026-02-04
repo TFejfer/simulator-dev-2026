@@ -75,6 +75,7 @@ try {
 	$runtimeRepo = new ExerciseRuntimeRepository($dbRuntime);
 
 	$outlineRow = $outlinesRepo->findOutlineRowById($outlineId, $deliveryId);
+
 	if (!$outlineRow) {
 		echo json_encode(['ok' => true, 'data' => ['status' => 'nogo', 'action' => 'modal', 'navigate_to' => '', 'outline_id' => $outlineId], 'error' => null], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 		exit;
@@ -84,6 +85,9 @@ try {
 	$exerciseNo = (int)($outlineRow['exercise_no'] ?? 0);
 	$skillId = (int)($outlineRow['skill_id'] ?? 0);
 	$formatId = (int)($outlineRow['format_id'] ?? 0);
+
+	$latest = $runtimeRepo->findLatestByOutline($accessId, $teamNo, $outlineId);
+	$maxStep = $latest ? (int)($latest['step_no'] ?? 0) : 0;
 
 	// Non-exercise items: navigate directly if you have routes; else modal/noop.
 	if ($itemType !== 'exercise' || $exerciseNo <= 0) {
@@ -107,8 +111,6 @@ try {
 	$isMultiPosition = ($formatId === 5);
 
 	// Determine current step for clicked outline
-	$latest = $runtimeRepo->findLatestByOutline($accessId, $teamNo, $outlineId);
-	$maxStep = $latest ? (int)($latest['step_no'] ?? 0) : 0;
 
 	// Determine if another exercise is open (in progress)
 	// We do it by scanning all outline_ids for this delivery.

@@ -1,44 +1,39 @@
-/* facts.js
+/* /common/assets/js/features/problem/forms/default/facts.js
  *
  * Problem > Facts form (migrated from legacy; optimized structure).
  *
- * Includes fixes:
- * 1) what_not is computed from prioritized symptom and updates immediately.
- * 2) what_ok modal stays open; can add multiple items; list shows delete "x".
- * 3) when modal delete removes item immediately and stays consistent (rebuild from store).
+ * Optimal module contract:
+ * - export default { render(store, view), bind(ctx, view) }
+ * - view.root_id: container selector (e.g. '#display_facts')
+ * - view.mode: numeric mode (1 enabled, 2 limited, 3 disabled)
  *
- * UI parity with legacy:
- * - 2-column grid (NOT WORKING vs WORKING)
- * - Fieldsets for: what/where/when/other
- * - Modals:
- *   - what_ok: list + add multiple + delete x
- *   - where: toggle buttons create/delete
- *   - when: flatpickr add + delete x
- *   - other: textarea update/create
+ * Includes fixes:
+ * - what_not is computed from prioritized symptom and updates immediately.
+ * - what_ok modal stays open; can add multiple items; list shows delete "x".
+ * - modal delete removes item immediately and stays consistent (rebuild from store).
+ *
+ * Notes:
+ * - This module does NOT self-register. Registration happens in the template bundle.
+ * - Event handlers are delegated and namespaced to avoid duplicate bindings.
  */
 
 /* global $, simulatorShowConfirm, showSimulatorModal, hideSimulatorModal */
 
-(() => {
+const FactsForm = (() => {
 	'use strict';
 
+	const H = window.ProblemFormsHelpers;
+
 	const FORM_KEY = 'facts';
-	const CONTAINER = `#display_${FORM_KEY}`;
+	const EVENT_NS = '.problem_facts';
 
 	// ---------------------------------
 	// Term helpers (SIM_SHARED maps)
 	// ---------------------------------
-	const tMap = (bucket, id, fallback = '') => {
-		const src = window.SIM_SHARED?.[bucket];
-		if (!src || typeof src !== 'object') return fallback;
-		const v = src[String(id)];
-		return (typeof v === 'string' && v !== '') ? v : fallback;
-	};
-
-	const Common = (id, fallback = '') => tMap('common_terms', id, fallback);
-	const Problem = (id, fallback = '') => tMap('problem_terms', id, fallback);
-	const Method = (id, fallback = '') => tMap('troubleshooting_methods', id, fallback);
-	const Themes = (id, fallback = '') => tMap('themes', id, fallback);
+	const Common = (id, fallback = '') => H.tMap('common_terms', id, fallback);
+	const Problem = (id, fallback = '') => H.tMap('problem_terms', id, fallback);
+	const Method = (id, fallback = '') => H.tMap('troubleshooting_methods', id, fallback);
+	const Themes = (id, fallback = '') => H.tMap('themes', id, fallback);
 
 	// ---------------------------------
 	// Shared lookup helpers
@@ -73,10 +68,10 @@
 	// ---------------------------------
 	// Store helpers
 	// ---------------------------------
-	const getMode = (store) => store.get().case?.visibility?.[FORM_KEY] ?? 0;
-	const editable = (mode) => mode === 1;
-
-	const getThemeId = (store) => store.get().meta?.theme_id ?? store.get().meta?.exercise?.theme_id ?? 0;
+	const getThemeId = (store) => {
+		const d = store.get();
+		return d?.meta?.theme_id ?? d?.meta?.exercise?.theme_id ?? 0;
+	};
 
 	const getFacts = (store) => {
 		const arr = store.get().case?.facts;
@@ -86,15 +81,6 @@
 	const getSymptoms = (store) => {
 		const arr = store.get().case?.symptoms;
 		return Array.isArray(arr) ? arr : [];
-	};
-
-	const esc = (s) => {
-		return String(s ?? '')
-			.replaceAll('&', '&amp;')
-			.replaceAll('<', '&lt;')
-			.replaceAll('>', '&gt;')
-			.replaceAll('"', '&quot;')
-			.replaceAll("'", '&#039;');
 	};
 
 	// ---------------------------------
@@ -109,7 +95,7 @@
 
 		const deviationId = parseInt(s.deviation_id || 0, 10) || 0;
 		const functionId = parseInt(s.function_id || 0, 10) || 0;
-		const clarify = String(s.clarify_text || '');
+		const clarify = H.normalizeDbText(s.clarify_text);
 
 		const dText = (window.SIM_SHARED?.deviations || {})[String(deviationId)] || '';
 		const fText = functionText(themeId, functionId);
@@ -133,7 +119,7 @@
 		const kv = parseWhatOkKeyValue(row.key_value);
 		const nText = normalityText(kv.normality_id);
 		const fText = functionText(themeId, kv.function_id);
-		const clarify = String(row.text || '').replace(/\\/g, '');
+		const clarify = H.normalizeDbText(row.text);
 		return `${nText} ${fText}. ${clarify}`.trim();
 	};
 
@@ -144,7 +130,7 @@
 		if (keyMeta === 'what_ok') {
 			return arr.map((row) => `
 				<div class="fact-line">
-					${esc(buildWhatOkLine(row, themeId))}
+					${H.esc(buildWhatOkLine(row, themeId))}
 					${allowDelete ? `<span class="clickable delete-fact" data-field="what_ok" data-id="${row.id}">×</span>` : ''}
 				</div>
 			`).join('');
@@ -154,18 +140,20 @@
 			const sorted = [...arr].sort((a, b) => (parseInt(a.key_value, 10) || 0) - (parseInt(b.key_value, 10) || 0));
 			return sorted.map((row) => `
 				<div class="fact-line">
-					${(String(row.key_value) === '0') ? esc(Problem(89, 'No comparable system')) : esc(`${Themes(themeId)}-${row.key_value}`)}
+					${(String(row.key_value) === '0')
+						? H.esc(Problem(89, 'No comparable system'))
+						: H.esc(`${Themes(themeId)}-${row.key_value}`)}
 				</div>
 			`).join('');
 		}
 
 		if (keyMeta === 'when_not' || keyMeta === 'when_ok') {
 			const sorted = [...arr].sort((a, b) => String(a.key_value).localeCompare(String(b.key_value)));
-			return sorted.map((row) => `<div class="fact-line">${esc(row.key_value)}</div>`).join('');
+			return sorted.map((row) => `<div class="fact-line">${H.esc(row.key_value)}</div>`).join('');
 		}
 
 		const first = arr[0];
-		return esc(first?.text || '');
+		return H.esc(first?.text || '');
 	};
 
 	const getOtherRow = (facts, keyMeta) => {
@@ -189,7 +177,7 @@
 
 		$('#whenNotList').html(wn.map((r) => `
 			<div class="fact-when-element">
-				${esc(r.key_value)}
+				${H.esc(r.key_value)}
 				<span class="clickable delete-fact" data-field="when_not" data-id="${r.id}">
 					<i class="fa-solid fa-xmark"></i>
 				</span>
@@ -198,7 +186,7 @@
 
 		$('#whenOkList').html(wo.map((r) => `
 			<div class="fact-when-element">
-				${esc(r.key_value)}
+				${H.esc(r.key_value)}
 				<span class="clickable delete-fact" data-field="when_ok" data-id="${r.id}">
 					<i class="fa-solid fa-xmark"></i>
 				</span>
@@ -219,18 +207,22 @@
 			onClose: async (selectedDates, dateStr, instance) => {
 				if (!dateStr) return;
 
-				const res = await window.ProblemFormsController.writeForm(
-					'facts',
-					'create',
-					{ key_meta: keyMeta, key_value: dateStr, text: '' },
+				const res = await H.safeWrite(
 					store,
-					scope
+					() => window.ProblemFormsController.writeForm(
+						FORM_KEY,
+						'create',
+						{ key_meta: keyMeta, key_value: dateStr, text: '' },
+						store,
+						scope
+					),
+					'Save failed. Please try again.'
 				);
-
-				if (!res?.ok) console.warn('[facts] create when failed', res);
+				if (!res) return;
 
 				instance.clear();
 				refreshWhenModalLists(store);
+				H.renderPlan(store);
 			}
 		});
 
@@ -242,7 +234,7 @@
 	// Restore method (facts)
 	// ---------------------------------
 	const renderRestoreMethod = () => `
-		<div id="met_step2">
+		<div class="method-step">
 			<ul>
 				<li><span class="method-question">${Method(10)}</span></li>
 			</ul>
@@ -266,20 +258,21 @@
 	// ---------------------------------
 	// Render
 	// ---------------------------------
-	const render = (store) => {
-		const mode = getMode(store);
+	const render = (store, view) => {
+		const mode = Number(view?.mode ?? 0);
+		const rootId = String(view?.root_id || `#display_${FORM_KEY}`);
 
-		if (mode === 0) {
-			$(CONTAINER).empty();
+		if (!H.isVisible(mode)) {
+			$(rootId).empty();
 			return;
 		}
 
-		const canEdit = editable(mode);
+		const canEdit = H.isEditable(mode);
 		const themeId = getThemeId(store);
 		const facts = getFacts(store);
 		const whatNotText = getPrioritySymptomText(store);
 
-		$(CONTAINER).html(`
+		$(rootId).html(`
 			<details class="form-method">
 				<summary class="form-step-header">2. ${Problem(5, 'Facts')}</summary>
 				${renderRestoreMethod()}
@@ -292,7 +285,7 @@
 				<fieldset class="${canEdit ? 'case-field edit-fact clickable' : 'case-field-readonly'}" data-factpair="what">
 					<legend class="case-label">${Problem(8, 'What')}</legend>
 					<div class="fact ${canEdit ? 'case-item-clickable' : 'case-item'}" data-fact="what_not">
-						${esc(whatNotText)}
+						${H.esc(whatNotText)}
 					</div>
 				</fieldset>
 
@@ -333,26 +326,26 @@
 
 				<fieldset class="${canEdit ? 'case-field edit-fact clickable' : 'case-field-readonly'}" data-factpair="other">
 					<legend class="case-label">${Problem(32, 'Other')}</legend>
-					<textarea class="other-fact ${canEdit ? 'clickable' : 'textarea-readonly'}" data-factpair="other" rows="4" readonly>${esc(buildFactContent(facts, themeId, 'other_not'))}</textarea>
+					<textarea class="other-fact ${canEdit ? 'clickable' : 'textarea-readonly'}" data-factpair="other" rows="4" readonly>${H.esc(buildFactContent(facts, themeId, 'other_not'))}</textarea>
 				</fieldset>
 
 				<fieldset class="${canEdit ? 'case-field edit-fact clickable' : 'case-field-readonly'}" data-factpair="other">
 					<legend class="case-label">${Problem(32, 'Other')}</legend>
-					<textarea class="other-fact ${canEdit ? 'clickable' : 'textarea-readonly'}" data-factpair="other" rows="4" readonly>${esc(buildFactContent(facts, themeId, 'other_ok'))}</textarea>
+					<textarea class="other-fact ${canEdit ? 'clickable' : 'textarea-readonly'}" data-factpair="other" rows="4" readonly>${H.esc(buildFactContent(facts, themeId, 'other_ok'))}</textarea>
 				</fieldset>
 			</div>
 		`);
 	};
 
 	// ---------------------------------
-	// Modal builders (WHERE + OTHER included)
+	// Modal builders
 	// ---------------------------------
 	const modalWhatOk = (store) => {
 		const themeId = getThemeId(store);
 
 		const nOptions = Object.entries(normalitiesMap())
 			.sort((a, b) => parseInt(a[0], 10) - parseInt(b[0], 10))
-			.map(([id, text]) => `<option value="${id}">${esc(text)}</option>`)
+			.map(([id, text]) => `<option value="${id}">${H.esc(text)}</option>`)
 			.join('');
 
 		const raw = functionsRaw();
@@ -361,12 +354,12 @@
 		if (Array.isArray(raw)) {
 			fOptions = raw
 				.filter((r) => String(r?.theme_id ?? '') === String(themeId))
-				.map((r) => `<option value="${r.function_id}">${esc(r.text_value || '')}</option>`)
+				.map((r) => `<option value="${r.function_id}">${H.esc(r.text_value || '')}</option>`)
 				.join('');
 		} else if (raw && typeof raw === 'object') {
 			fOptions = Object.entries(raw)
 				.sort((a, b) => parseInt(a[0], 10) - parseInt(b[0], 10))
-				.map(([id, text]) => `<option value="${id}">${esc(text)}</option>`)
+				.map(([id, text]) => `<option value="${id}">${H.esc(text)}</option>`)
 				.join('');
 		}
 
@@ -482,23 +475,34 @@
 
 				<fieldset class="fact1-content facts-other-not case-field">
 					<legend class="case-label">${Problem(32, 'Other')}</legend>
-					<textarea class="other-fact throttle-field" rows="4" data-column="other_not" data-id="${otherNot.id}">${esc(otherNot.text || '')}</textarea>
+					<textarea class="other-fact throttle-field" rows="4" data-column="other_not" data-id="${otherNot.id}">${H.esc(otherNot.text || '')}</textarea>
 				</fieldset>
 
 				<fieldset class="fact2-content facts-other-ok case-field">
 					<legend class="case-label">${Problem(32, 'Other')}</legend>
-					<textarea class="other-fact throttle-field" rows="4" data-column="other_ok" data-id="${otherOk.id}">${esc(otherOk.text || '')}</textarea>
+					<textarea class="other-fact throttle-field" rows="4" data-column="other_ok" data-id="${otherOk.id}">${H.esc(otherOk.text || '')}</textarea>
 				</fieldset>
 			</div>
 		`;
 	};
 
 	// ---------------------------------
-	// Events
+	// Bind (idempotent, plan-driven)
 	// ---------------------------------
-	const bind = ({ store, scope }) => {
+	const bind = (ctx, view) => {
+		const store = ctx.store;
+		const scope = ctx.scope;
+
+		const mode = Number(view?.mode ?? 0);
+		if (!H.isEditable(mode)) {
+			return;
+		}
+
+		// Ensure we do not duplicate event handlers across rebinds.
+		$(document).off(EVENT_NS);
+
 		// Block click on what_not (avoid opening the what_ok modal)
-		$(document).on('click', `.fact[data-fact="what_not"].case-item-clickable`, (e) => {
+		$(document).on(`click${EVENT_NS}`, `.fact[data-fact="what_not"].case-item-clickable`, (e) => {
 			e.preventDefault();
 			e.stopPropagation();
 			e.stopImmediatePropagation();
@@ -510,9 +514,7 @@
 		});
 
 		// Open edit modal (all fact pairs)
-		$(document).on('click', '.edit-fact', function () {
-			if (!editable(getMode(store))) return;
-
+		$(document).on(`click${EVENT_NS}`, '.edit-fact', function () {
 			const factpair = String($(this).attr('data-factpair') || '');
 			$('#simulator_modal_title').html('');
 
@@ -535,7 +537,7 @@
 				$('#simulator_modal_footer').empty();
 				showSimulatorModal('simulator_modal_common');
 
-				// Mark selected buttons based on store (canonical)
+				// Mark selected buttons based on canonical store
 				const facts = getFacts(store);
 				byMeta(facts, 'where_not').forEach((r) => {
 					$(`.modal-fact-where[data-fact="where_not"][data-nmb="${r.key_value}"]`)
@@ -570,12 +572,10 @@
 		});
 
 		// Insert what_ok (keep modal open)
-		$(document).on('click', '.insert-what-ok', async () => {
-			if (!editable(getMode(store))) return;
-
+		$(document).on(`click${EVENT_NS}`, '.insert-what-ok', async () => {
 			const normalityId = parseInt(String($('#normality option:selected').val() || '0'), 10);
 			const functionId = parseInt(String($('#function option:selected').val() || '0'), 10);
-			const clarify = String($('#whatOkClarify').text() || '');
+			const clarify = H.normalizeDbText($('#whatOkClarify').text());
 
 			if (normalityId <= 0 || functionId <= 0) {
 				simulatorShowConfirm({
@@ -592,21 +592,23 @@
 				text: clarify
 			};
 
-			const res = await window.ProblemFormsController.writeForm(FORM_KEY, 'create', payload, store, scope);
-			if (!res?.ok) console.warn('[facts] create what_ok failed', res);
+			const res = await H.safeWrite(
+				store,
+				() => window.ProblemFormsController.writeForm(FORM_KEY, 'create', payload, store, scope),
+				'Save failed. Please try again.'
+			);
+			if (!res) return;
 
 			refreshWhatOkModalList(store);
 			$('#normality').prop('selectedIndex', 0);
 			$('#function').prop('selectedIndex', 0);
 			$('#whatOkClarify').empty();
 
-			render(store);
+			H.renderPlan(store);
 		});
 
 		// Delete a fact row (works for what_ok, when_ok, when_not)
-		$(document).on('click', '.delete-fact', async function () {
-			if (!editable(getMode(store))) return;
-
+		$(document).on(`click${EVENT_NS}`, '.delete-fact', async function () {
 			const id = parseInt(String($(this).attr('data-id') || '0'), 10);
 			if (!id) return;
 
@@ -616,20 +618,28 @@
 
 			const field = String($(this).attr('data-field') || '');
 
-			const res = await window.ProblemFormsController.writeForm(FORM_KEY, 'delete', { id }, store, scope);
-			if (!res?.ok) console.warn('[facts] delete failed', res);
+			const res = await H.safeWrite(
+				store,
+				() => window.ProblemFormsController.writeForm(FORM_KEY, 'delete', { id }, store, scope),
+				'Delete failed. Please try again.'
+			);
+
+			// On failure, safeWrite already rendered the plan. Rebuild modal lists too.
+			if (!res) {
+				if (field === 'what_ok') refreshWhatOkModalList(store);
+				if (field === 'when_ok' || field === 'when_not') refreshWhenModalLists(store);
+				return;
+			}
 
 			// Rebuild modal lists from canonical store
 			if (field === 'what_ok') refreshWhatOkModalList(store);
 			if (field === 'when_ok' || field === 'when_not') refreshWhenModalLists(store);
 
-			render(store);
+			H.renderPlan(store);
 		});
 
 		// Create or delete where fact
-		$(document).on('click', '.modal-fact-where', async function () {
-			if (!editable(getMode(store))) return;
-
+		$(document).on(`click${EVENT_NS}`, '.modal-fact-where', async function () {
 			const $el = $(this);
 			const keyMeta = String($el.attr('data-fact') || '');
 			const keyValue = String($el.attr('data-nmb') || '');
@@ -639,19 +649,20 @@
 			if ($el.hasClass('add-fact-where')) {
 				$el.addClass('remove-fact-where').removeClass('add-fact-where');
 
-				const res = await window.ProblemFormsController.writeForm(
-					FORM_KEY,
-					'create',
-					{ key_meta: keyMeta, key_value: keyValue, text: '' },
+				const res = await H.safeWrite(
 					store,
-					scope
+					() => window.ProblemFormsController.writeForm(
+						FORM_KEY,
+						'create',
+						{ key_meta: keyMeta, key_value: keyValue, text: '' },
+						store,
+						scope
+					),
+					'Save failed. Please try again.'
 				);
+				if (!res) return;
 
-				if (!res?.ok) console.warn('[facts] create where failed', res);
-
-				// ensure modal button has id (canonical)
-				// simplest: rebuild by reopening logic: just re-render main + keep modal state best-effort
-				render(store);
+				H.renderPlan(store);
 				return;
 			}
 
@@ -660,17 +671,19 @@
 				$el.addClass('add-fact-where').removeClass('remove-fact-where');
 				$el.attr('data-id', '');
 
-				const res = await window.ProblemFormsController.writeForm(FORM_KEY, 'delete', { id }, store, scope);
-				if (!res?.ok) console.warn('[facts] delete where failed', res);
+				const res = await H.safeWrite(
+					store,
+					() => window.ProblemFormsController.writeForm(FORM_KEY, 'delete', { id }, store, scope),
+					'Delete failed. Please try again.'
+				);
+				if (!res) return;
 
-				render(store);
+				H.renderPlan(store);
 			}
 		});
 
-		// Other: update on blur (id+text only, matches your FormsService)
-		$(document).on('blur', '.throttle-field[data-column="other_not"], .throttle-field[data-column="other_ok"]', async function () {
-			if (!editable(getMode(store))) return;
-
+		// Other: update on blur
+		$(document).on(`blur${EVENT_NS}`, '.throttle-field[data-column="other_not"], .throttle-field[data-column="other_ok"]', async function () {
 			const id = parseInt(String($(this).attr('data-id') || '0'), 10);
 			const column = String($(this).attr('data-column') || '');
 			const text = String($(this).val() || '');
@@ -679,33 +692,35 @@
 
 			// If there is no row yet, create it first
 			if (!id) {
-				const resCreate = await window.ProblemFormsController.writeForm(
-					FORM_KEY,
-					'create',
-					{ key_meta: column, key_value: '', text },
+				const resCreate = await H.safeWrite(
 					store,
-					scope
+					() => window.ProblemFormsController.writeForm(
+						FORM_KEY,
+						'create',
+						{ key_meta: column, key_value: '', text },
+						store,
+						scope
+					),
+					'Save failed. Please try again.'
 				);
-				if (!resCreate?.ok) console.warn('[facts] create other failed', resCreate);
-				render(store);
+				if (!resCreate) return;
+
+				H.renderPlan(store);
 				return;
 			}
 
-			const res = await window.ProblemFormsController.writeForm(
-				FORM_KEY,
-				'update',
-				{ id, text },
+			const res = await H.safeWrite(
 				store,
-				scope
+				() => window.ProblemFormsController.writeForm(FORM_KEY, 'update', { id, text }, store, scope),
+				'Save failed. Please try again.'
 			);
+			if (!res) return;
 
-			if (!res?.ok) console.warn('[facts] update other failed', res);
-			render(store);
+			H.renderPlan(store);
 		});
 	};
 
-	// Expose so symptoms can trigger facts re-render
-	window.ProblemFormFacts = { render, bind };
-
-	window.ProblemFormsRegistry.register({ key: FORM_KEY, render, bind });
+	return { render, bind };
 })();
+
+export default FactsForm;

@@ -30,6 +30,10 @@
 		// Prefer nested "data" block if present.
 		const payload = data.data ?? data;
 
+		if (formKey === 'worknotes' && payload.worknotes && typeof payload.worknotes === 'object') {
+			store.get().case.worknotes = payload.worknotes;
+		}
+		
 		if (formKey === 'description' && payload.description && typeof payload.description === 'object') {
 			store.get().case.description = payload.description;
 		}
@@ -40,6 +44,10 @@
 
 		if (formKey === 'facts' && Array.isArray(payload.facts)) {
 			store.get().case.facts = payload.facts;
+		}
+
+		if (formKey === 'specification' && Array.isArray(payload.specification)) {
+			store.get().case.specification = payload.specification;
 		}
 
 		if (formKey === 'attachments' && payload.attachments && typeof payload.attachments === 'object') {
@@ -64,28 +72,6 @@
 
 		if (formKey === 'reflections' && payload.reflections && typeof payload.reflections === 'object') {
 			store.get().case.reflections = payload.reflections;
-		}
-
-		// KT forms
-
-		if (formKey === 'kt-appraisal' && payload.attachments && typeof payload['kt-appraisal'] === 'object') {
-			store.get().case.attachments = payload.attachments;
-		}
-
-		if (formKey === 'kt-specification' && payload.attachments && typeof payload['kt-specification'] === 'object') {
-			store.get().case.attachments = payload.attachments;
-		}
-
-		if (formKey === 'kt-causes' && payload.attachments && typeof payload['kt-causes'] === 'object') {
-			store.get().case.attachments = payload.attachments;
-		}
-
-		if (formKey === 'kt-actions' && payload.attachments && typeof payload['kt-actions'] === 'object') {
-			store.get().case.attachments = payload.attachments;
-		}
-
-		if (formKey === 'kt-reflections' && payload.attachments && typeof payload['kt-reflections'] === 'object') {
-			store.get().case.attachments = payload.attachments;
 		}
 	};
 

@@ -112,7 +112,15 @@ $publishedJsonService = new \Modules\Shared\Services\PublishedJsonService($publi
 // ---------- 4) Shared content (shared_content payload) ----------
 
 $sharedTextsRepo      = new \Modules\Shared\Repositories\SharedContentTextsRepository($dbSharedContent);
-$sharedContentBuilder = new \Modules\Shared\Services\SharedContent\Builders\SharedContentPayloadBuilder($sharedTextsRepo);
+$sharedExerciseParamsRepo = null;
+if (class_exists(\Modules\Shared\Repositories\SharedExerciseParametersRepository::class)) {
+    $sharedExerciseParamsRepo = new \Modules\Shared\Repositories\SharedExerciseParametersRepository($dbSharedContent);
+}
+
+$sharedContentBuilder = new \Modules\Shared\Services\SharedContent\Builders\SharedContentPayloadBuilder(
+    $sharedTextsRepo,
+    $sharedExerciseParamsRepo
+);
 $sharedContentService = new \Modules\Shared\Services\SharedContent\SharedContentService($publishedJsonService, $sharedContentBuilder);
 
 // ---------- Shared: notifications (runtime, dynamic; no publish) ----------
@@ -185,23 +193,33 @@ $trainingActiveRepo  = new \Modules\Training\Auth\Repositories\ActiveParticipant
 
 $exerciseRuntimeRepo = new \Modules\Training\Auth\Repositories\ExerciseRuntimeRepository($dbRuntime);
 $scenarioMetaRepo = null;
+$exerciseParamsRepo = null;
 
-// Optional dependency: only available if PROBLEM_CONTENT DB + class exist.
-// Bootstrap must NOT fatal if problem content layer is not loaded yet.
+// Optional dependency: only available if PROBLEM_CONTENT or SHARED_CONTENT layer exists.
+// Bootstrap must NOT fatal if content layer is not loaded yet.
 if (isset($dbProblemContent) && $dbProblemContent instanceof \PDO
-	&& class_exists(\Modules\Problem\Content\Repositories\ProblemScenarioMetaRepository::class)
+    && class_exists(\Modules\Problem\Content\Repositories\ProblemScenarioMetaRepository::class)
 ) {
-	$scenarioMetaRepo = new \Modules\Problem\Content\Repositories\ProblemScenarioMetaRepository(
-		$dbProblemContent, // PROBLEM_CONTENT PDO
-		false,             // useApcu
-		300                // ttl
-	);
+    $scenarioMetaRepo = new \Modules\Problem\Content\Repositories\ProblemScenarioMetaRepository(
+        $dbProblemContent, // PROBLEM_CONTENT PDO
+        false,             // useApcu
+        300                // ttl
+    );
+}
+
+// Prefer shared_content parameters; fall back to problem_content if not available.
+if (class_exists(\Modules\Shared\Repositories\SharedExerciseParametersRepository::class)) {
+    $exerciseParamsRepo = new \Modules\Shared\Repositories\SharedExerciseParametersRepository($dbSharedContent);
+} elseif (isset($dbProblemContent) && $dbProblemContent instanceof \PDO
+    && class_exists(\Modules\Problem\Content\Repositories\ProblemExerciseParametersRepository::class)) {
+    $exerciseParamsRepo = new \Modules\Problem\Content\Repositories\ProblemExerciseParametersRepository($dbProblemContent);
 }
 
 $exerciseMetaService = new \Modules\Training\Auth\Services\ExerciseMetaService(
 	$exerciseRuntimeRepo,
 	$trainingActiveRepo,
-	$scenarioMetaRepo
+    $scenarioMetaRepo,
+    $exerciseParamsRepo
 );
 
 // League repo is a stub until league tables are wired
@@ -212,7 +230,12 @@ $sessionService = new \Modules\Training\Auth\Support\SessionService();
 
 $loginPolicyService     = new \Modules\Training\Auth\Services\LoginPolicyService();
 $outlineRepo = new \Modules\Training\Auth\Repositories\OutlineRepository($dbSharedContent);
-$deliveryMetaBuilder = new \Modules\Training\Auth\Services\DeliveryMetaBuilder($outlineRepo);
+$templateRepo = new \Modules\Shared\Repositories\FormTemplateRepository($dbSharedContent);
+
+$deliveryMetaBuilder = new \Modules\Training\Auth\Services\DeliveryMetaBuilder(
+	$outlineRepo,
+	$templateRepo
+);
 
 // Pace strategies
 $instructorPacedStrategy = new \Modules\Training\Auth\Services\Pace\InstructorPacedStrategy($trainingActiveRepo);
@@ -255,6 +278,7 @@ $logoutService = new \Modules\Training\Auth\Services\ParticipantLogoutService(
  * - $participantLoginService
  * - $logoutService
  * - $exerciseMetaService
+ * - $exerciseParamsRepo (optional)
  * - $csrfService (optional for endpoints that render HTML forms)
  *
  * Endpoints should:

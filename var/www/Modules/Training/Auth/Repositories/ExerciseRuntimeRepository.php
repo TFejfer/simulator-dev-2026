@@ -65,7 +65,7 @@ final class ExerciseRuntimeRepository
 				SELECT
 					id,
 					outline_id,
-					skill_id
+					skill_id,
 					exercise_no,
 					theme_id,
 					scenario_id,
