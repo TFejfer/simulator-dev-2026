@@ -196,4 +196,32 @@ final class InstructorPollingRepository
 			];
 		}
 	}
+
+	/**
+	 * Emits a log_poll signal (used by server-side transitions such as timer expiry).
+	 */
+	public function emitSignal(int $accessId, int $teamNo, string $actorToken, string $tbl, ?string $info1 = null, ?string $info2 = null): bool
+	{
+		if ($accessId <= 0 || $tbl === '') return false;
+
+		$sql = "
+			INSERT INTO log_poll
+				(access_id, team_no, tbl, info_1, info_2, actor_token)
+			VALUES
+				(:access_id, :team_no, :tbl, :info_1, :info_2, :actor_token)
+		";
+
+		try {
+			$stmt = $this->dbRuntime->prepare($sql);
+			$stmt->bindValue(':access_id', $accessId, PDO::PARAM_INT);
+			$stmt->bindValue(':team_no', $teamNo, PDO::PARAM_INT);
+			$stmt->bindValue(':tbl', $tbl, PDO::PARAM_STR);
+			$stmt->bindValue(':info_1', $info1, $info1 === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+			$stmt->bindValue(':info_2', $info2, $info2 === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+			$stmt->bindValue(':actor_token', $actorToken, PDO::PARAM_STR);
+			return $stmt->execute();
+		} catch (PDOException) {
+			return false;
+		}
+	}
 }

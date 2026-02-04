@@ -25,6 +25,7 @@
 
 	let countUpStartUnix = 0;
 	let countDownEndUnix = 0;
+	let tickHandler = null;
 
 	let visibilityHooked = false;
 
@@ -37,6 +38,7 @@
 		rafId = 0;
 		activeMode = 'none';
 		lastRenderedSecond = -1;
+		tickHandler = null;
 	};
 
 	const pad2 = (n) => String(n).padStart(2, '0');
@@ -104,6 +106,10 @@
 			const t = Math.max(0, countDownEndUnix - nowUnix);
 			renderCountDown(t);
 
+			if (typeof tickHandler === 'function') {
+				tickHandler(t);
+			}
+
 			if (t <= 0) stop();
 		}
 	};
@@ -168,5 +174,9 @@
 		}
 	};
 
-	window.TopBarTimer = Object.freeze({ start, stop });
+	const setTickHandler = (fn) => {
+		tickHandler = (typeof fn === 'function') ? fn : null;
+	};
+
+	window.TopBarTimer = Object.freeze({ start, stop, setTickHandler });
 })();

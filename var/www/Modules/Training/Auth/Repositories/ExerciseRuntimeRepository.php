@@ -209,4 +209,168 @@ final class ExerciseRuntimeRepository
 			return 0;
 		}
 	}
+
+	/**
+	 * Inserts a generic log_exercise row (used for server-side transitions like times-up).
+	 * Returns inserted id (0 on failure).
+	 */
+	public function insertStep(array $row): int
+	{
+		try {
+			$stmt = $this->dbRuntime->prepare("
+				INSERT INTO log_exercise
+					(access_id, team_no, outline_id, skill_id, exercise_no, theme_id, scenario_id, format_id, step_no, current_state, next_state, actor_token, actor_name, include_in_poll)
+				VALUES
+					(:access_id, :team_no, :outline_id, :skill_id, :exercise_no, :theme_id, :scenario_id, :format_id, :step_no, :current_state, :next_state, :actor_token, :actor_name, :include_in_poll)
+			");
+
+			$stmt->execute([
+				':access_id' => (int)$row['access_id'],
+				':team_no' => (int)$row['team_no'],
+				':outline_id' => (int)$row['outline_id'],
+				':skill_id' => (int)$row['skill_id'],
+				':exercise_no' => (int)$row['exercise_no'],
+				':theme_id' => (int)$row['theme_id'],
+				':scenario_id' => (int)$row['scenario_id'],
+				':format_id' => (int)$row['format_id'],
+				':step_no' => (int)$row['step_no'],
+				':current_state' => $row['current_state'],
+				':next_state' => $row['next_state'],
+				':actor_token' => (string)$row['actor_token'],
+				':actor_name' => (string)$row['actor_name'],
+				':include_in_poll' => isset($row['include_in_poll']) ? (int)$row['include_in_poll'] : 1,
+			]);
+
+			return (int)$this->dbRuntime->lastInsertId();
+		} catch (Throwable) {
+			return 0;
+		}
+	}
+
+	/**
+	 * Earliest row for a given step_no (used for timer anchors).
+	 *
+	 * @return array<string,mixed>|null
+	 */
+	public function findFirstStepTimestamp(int $accessId, int $teamNo, int $stepNo): ?array
+	{
+		if ($accessId <= 0 || $teamNo <= 0 || $stepNo <= 0) return null;
+
+		try {
+			$stmt = $this->dbRuntime->prepare("
+				SELECT
+					id,
+					step_no,
+					current_state,
+					next_state,
+					UNIX_TIMESTAMP(created_at) AS created_at_ts
+				FROM log_exercise
+				WHERE access_id = :access_id
+				  AND team_no   = :team_no
+				  AND step_no   = :step_no
+				ORDER BY id ASC
+				LIMIT 1
+			");
+
+			$stmt->execute([
+				':access_id' => $accessId,
+				':team_no'   => $teamNo,
+				':step_no'   => $stepNo,
+			]);
+
+			$row = $stmt->fetch(PDO::FETCH_ASSOC);
+			return $row ?: null;
+
+		} catch (Throwable) {
+			return null;
+		}
+	}
+
+	/**
+	 * Earliest row for a given outline_id + step_no (anchor start of this exercise run).
+	 *
+	 * @return array<string,mixed>|null
+	 */
+	public function findFirstStepTimestampForOutline(int $accessId, int $teamNo, int $outlineId, int $stepNo): ?array
+	{
+		if ($accessId <= 0 || $teamNo <= 0 || $outlineId <= 0 || $stepNo <= 0) return null;
+
+		try {
+			$stmt = $this->dbRuntime->prepare("
+				SELECT
+					id,
+					outline_id,
+					step_no,
+					current_state,
+					next_state,
+					UNIX_TIMESTAMP(created_at) AS created_at_ts
+				FROM log_exercise
+				WHERE access_id = :access_id
+				  AND team_no   = :team_no
+				  AND outline_id = :outline_id
+				  AND step_no   = :step_no
+				ORDER BY id ASC
+				LIMIT 1
+			");
+
+			$stmt->execute([
+				':access_id' => $accessId,
+				':team_no'   => $teamNo,
+				':outline_id' => $outlineId,
+				':step_no'   => $stepNo,
+			]);
+
+			$row = $stmt->fetch(PDO::FETCH_ASSOC);
+			return $row ?: null;
+
+		} catch (Throwable) {
+			return null;
+		}
+	}
+
+	/**
+	 * Full log_exercise rows for a given outline_id (ordered ASC by id).
+	 *
+	 * @return array<int,array<string,mixed>>
+	 */
+	public function findLogByOutline(int $accessId, int $teamNo, int $outlineId): array
+	{
+		if ($accessId <= 0 || $teamNo <= 0 || $outlineId <= 0) return [];
+
+		try {
+			$stmt = $this->dbRuntime->prepare("
+				SELECT
+					id,
+					created_at,
+					access_id,
+					team_no,
+					outline_id,
+					skill_id,
+					exercise_no,
+					theme_id,
+					scenario_id,
+					format_id,
+					step_no,
+					current_state,
+					next_state
+				FROM log_exercise
+				WHERE access_id = :access_id
+				  AND team_no   = :team_no
+				  AND outline_id = :outline_id
+				ORDER BY id ASC
+			");
+
+			$stmt->execute([
+				':access_id' => $accessId,
+				':team_no' => $teamNo,
+				':outline_id' => $outlineId,
+			]);
+
+			$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+			return is_array($rows) ? $rows : [];
+
+		} catch (Throwable) {
+			return [];
+		}
+	}
 }

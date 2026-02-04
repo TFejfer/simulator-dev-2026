@@ -77,8 +77,6 @@ try {
 				'updates' => [],
 				'server_latest_poll_id' => $lastPollId,
 				'effective_last_poll_id' => $lastPollId,
-				// Optional future extension:
-				// 'navigate_to' => '/training/pages/training-instructor-setup.php'
 			],
 			'error' => null
 		], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -101,6 +99,9 @@ try {
 		maxRows: 20,
 		fallbackLookbackRows: 200
 	);
+
+	// NOTE: Do not force navigation here to avoid redirecting non-exercise pages (outline etc.).
+	$navigateTo = '';
 
 	echo json_encode([
 		'ok' => true,

@@ -207,12 +207,12 @@ if (isset($dbProblemContent) && $dbProblemContent instanceof \PDO
     );
 }
 
-// Prefer shared_content parameters; fall back to problem_content if not available.
-if (class_exists(\Modules\Shared\Repositories\SharedExerciseParametersRepository::class)) {
-    $exerciseParamsRepo = new \Modules\Shared\Repositories\SharedExerciseParametersRepository($dbSharedContent);
-} elseif (isset($dbProblemContent) && $dbProblemContent instanceof \PDO
+// Prefer PROBLEM_CONTENT params for problem_* keys; fall back to SHARED_CONTENT.
+if (isset($dbProblemContent) && $dbProblemContent instanceof \PDO
     && class_exists(\Modules\Problem\Content\Repositories\ProblemExerciseParametersRepository::class)) {
     $exerciseParamsRepo = new \Modules\Problem\Content\Repositories\ProblemExerciseParametersRepository($dbProblemContent);
+} elseif (class_exists(\Modules\Shared\Repositories\SharedExerciseParametersRepository::class)) {
+    $exerciseParamsRepo = new \Modules\Shared\Repositories\SharedExerciseParametersRepository($dbSharedContent);
 }
 
 $exerciseMetaService = new \Modules\Training\Auth\Services\ExerciseMetaService(

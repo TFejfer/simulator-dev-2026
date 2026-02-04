@@ -32,6 +32,67 @@
 		return out;
 	};
 
+	const clearTimerColors = () => {
+		if (!$) return;
+		$('#topBarArea4').removeClass('timer-color-yellow timer-color-red');
+	};
+
+	const countdownTickHandler = (ctx) => {
+		const format = Number(ctx?.format_no || ctx?.format || 0);
+		const shouldColor = [1, 10, 11].includes(format);
+		let blink = false;
+		let firedTimesUp = false;
+
+		const triggerTimesUp = () => {
+			if (firedTimesUp) return;
+			firedTimesUp = true;
+
+			try {
+				window.fetch('/ajax/training_instructor_timesup.php', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: '{}'
+				}).finally(() => {
+					window.location.href = '/training-problem-instructor-timesup.php';
+				});
+			} catch {
+				window.location.href = '/training-problem-instructor-timesup.php';
+			}
+		};
+
+		return (tSeconds) => {
+			if (!$) return;
+			const area = $('#topBarArea4');
+			if (!area || area.length === 0) return;
+
+			area.removeClass('timer-color-yellow timer-color-red');
+
+			if (!Number.isFinite(tSeconds)) return;
+
+			if (tSeconds <= 0) {
+				triggerTimesUp();
+				return;
+			}
+
+			if (!shouldColor) return;
+
+			if (tSeconds < 60) {
+				blink = !blink;
+				if (blink) area.addClass('timer-color-red');
+				return;
+			}
+
+			if (tSeconds < 300) {
+				area.addClass('timer-color-red');
+				return;
+			}
+
+			if (tSeconds < 600) {
+				area.addClass('timer-color-yellow');
+			}
+		};
+	};
+
 	const buildCtx = (overrides = {}) => {
 		const pd = readPageData() || {};
 		const page_key = String(pd?.CTX_KEY || '');
@@ -139,6 +200,15 @@
 		} else {
 			if (overrides && overrides._forceTimerRestart && window.TopBarTimer) {
 				window.TopBarTimer.start(mode, ctx);
+			}
+		}
+
+		if (window.TopBarTimer?.setTickHandler) {
+			if (mode === 'countdown') {
+				window.TopBarTimer.setTickHandler(countdownTickHandler(ctx));
+			} else {
+				window.TopBarTimer.setTickHandler(null);
+				clearTimerColors();
 			}
 		}
 

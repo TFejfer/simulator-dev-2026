@@ -50,19 +50,44 @@ try {
 }
 
 $serverNow = time();
-$exerciseStartUnix = strtotime($exerciseMeta->createdAtIso ?? '') ?: 0;
+
+// Timer fields are precomputed and cached in session (ExerciseMetaService)
+$exerciseStartUnix = (int)($exerciseMetaArr['exercise_start_unix'] ?? 0);
 $deadlineUnix = (int)($exerciseMetaArr['deadline_unix'] ?? 0);
 $secondsLeft = (int)($exerciseMetaArr['seconds_left'] ?? 0);
 
-// Fallback: derive discovery countdown from shared/problem parameter when missing.
-if (in_array((int)($exerciseMetaArr['format_id'] ?? 0), [1, 10, 11], true)
-	&& $deadlineUnix <= 0 && $secondsLeft <= 0 && $exerciseStartUnix > 0) {
-	$discoverySeconds = (int)($_SESSION['exercise_meta']['problem_discovery_time'] ?? $_SESSION['exercise_meta']['discovery_time'] ?? 1500);
-	if ($discoverySeconds > 0) {
-		$deadlineUnix = $exerciseStartUnix + $discoverySeconds;
-		$secondsLeft = max(0, $deadlineUnix - $serverNow);
+// Timer parameters (from shared_content.exercise_parameters with problem_* keys)
+$timerParams = [];
+if (isset($exerciseParamsRepo)) {
+	if (method_exists($exerciseParamsRepo, 'readAll')) {
+		$timerParams = $exerciseParamsRepo->readAll();
+	} elseif (method_exists($exerciseParamsRepo, 'getValue')) {
+		$keys = [
+			'problem_introduction_time',
+			'problem_discovery_time',
+			'problem_discovery_swap_registration',
+			'problem_discovery_swap_investigation',
+			'problem_max_finalize_time_in_seconds',
+			'problem_swap_time'
+		];
+		foreach ($keys as $k) {
+			$timerParams[$k] = $exerciseParamsRepo->getValue($k);
+		}
 	}
 }
+
+// Timer inputs are already computed by ExerciseMetaService; use as-is
+$timerInput = [
+	'exercise_start_unix' => $exerciseStartUnix,
+	'deadline_unix' => $deadlineUnix,
+	'seconds_left' => $secondsLeft,
+	'timer_end_unix' => (int)($exerciseMetaArr['timer_end_unix'] ?? 0),
+	'phase' => (string)($exerciseMetaArr['timer_phase'] ?? ''),
+	'source' => (string)($exerciseMetaArr['timer_source'] ?? 'problem-timer/v1'),
+];
+
+$timerEndUnix = (int)$timerInput['timer_end_unix'];
+$timerPhase = (string)$timerInput['phase'];
 
 // Release session lock early (critical for parallel AJAX)
 session_write_close();
@@ -173,6 +198,9 @@ echo json_encode([
 			'exercise_start_unix' => $exerciseStartUnix,
 			'deadline_unix' => $deadlineUnix,
 			'seconds_left' => $secondsLeft,
+			'timer_end_unix' => $timerEndUnix,
+			'timer_phase' => $timerPhase,
+			'timer_source' => $timerInput['source'] ?? 'problem-timer/v1',
 		]),
 	]),
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

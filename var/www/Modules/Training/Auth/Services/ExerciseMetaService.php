@@ -9,6 +9,7 @@ use Modules\Training\Auth\DTO\ExerciseMeta;
 use Modules\Training\Auth\Repositories\ExerciseRuntimeRepository;
 use Modules\Training\Auth\Repositories\ActiveParticipantRepository;
 use Modules\Problem\Content\Repositories\ProblemScenarioMetaRepository;
+use Modules\Shared\Support\Timer\ProblemTimerCalculator;
 
 /**
  * ExerciseMetaService
@@ -76,6 +77,7 @@ final class ExerciseMetaService
 			accessId:      (int)$row['access_id'],
 			teamNo:        (int)$row['team_no'],
 			outlineId:     (int)$row['outline_id'],
+			skillId:       isset($row['skill_id']) ? (int)$row['skill_id'] : null,
 
 			exerciseNo:    isset($row['exercise_no']) ? (int)$row['exercise_no'] : null,
 			themeId:       isset($row['theme_id']) ? (int)$row['theme_id'] : null,
@@ -101,15 +103,59 @@ final class ExerciseMetaService
 			error_log('[exercise-meta] ' . $warning);
 		}
 
-		$_SESSION[self::SESSION_KEY] = $meta->toArray();
+		$metaArr = $meta->toArray();
 
-		// Attach shared exercise parameters (e.g., problem_discovery_time) into session cache for consumers.
-		if ($this->exerciseParamsRepo && method_exists($this->exerciseParamsRepo, 'getValue')) {
-			$discovery = $this->exerciseParamsRepo->getValue('problem_discovery_time');
-			if ($discovery !== null) {
-				$_SESSION[self::SESSION_KEY]['problem_discovery_time'] = $discovery;
+		// Timer parameters (prefer repo if available)
+		$timerParams = [];
+		if ($this->exerciseParamsRepo) {
+			if (method_exists($this->exerciseParamsRepo, 'readAll')) {
+				$timerParams = $this->exerciseParamsRepo->readAll();
+			} elseif (method_exists($this->exerciseParamsRepo, 'getValue')) {
+				$keys = [
+					'problem_introduction_time',
+					'problem_discovery_time',
+					'problem_discovery_swap_registration',
+					'problem_discovery_swap_investigation',
+					'problem_max_finalize_time_in_seconds',
+					'problem_swap_time'
+				];
+				foreach ($keys as $k) {
+					$timerParams[$k] = $this->exerciseParamsRepo->getValue($k);
+				}
 			}
 		}
+
+		// Anchor exercise_start_unix to first step 20 for this outline (fallback to created_at)
+		$outlineId = (int)$meta->outlineId;
+		$start20 = $outlineId > 0 ? $this->logExerciseRepo->findFirstStepTimestampForOutline($accessId, $teamNo, $outlineId, 20) : null;
+		$exerciseStartUnix = (int)($start20['created_at_ts'] ?? 0);
+		if ($exerciseStartUnix <= 0) {
+			$exerciseStartUnix = strtotime($meta->createdAtIso ?? '') ?: 0;
+		}
+
+		// Compute timer inputs once and cache into session
+		$timerCalc = new ProblemTimerCalculator($this->logExerciseRepo);
+		$timerInput = $timerCalc->compute(array_merge($metaArr, [
+			'access_id' => $accessId,
+			'team_no' => $teamNo,
+			'outline_id' => $outlineId,
+			'exercise_start_unix' => $exerciseStartUnix,
+		]), $timerParams);
+
+		$metaArr = array_merge($metaArr, [
+			'problem_discovery_time' => $timerParams['problem_discovery_time'] ?? null,
+			'exercise_start_unix' => (int)($timerInput['exercise_start_unix'] ?? $exerciseStartUnix),
+			'deadline_unix' => (int)($timerInput['deadline_unix'] ?? 0),
+			'seconds_left' => (int)($timerInput['seconds_left'] ?? 0),
+			'timer_start_unix' => (int)($timerInput['timer_start_unix'] ?? 0),
+			'timer_end_unix' => (int)($timerInput['timer_end_unix'] ?? 0),
+			'timer_phase' => (string)($timerInput['phase'] ?? ''),
+			'timer_source' => (string)($timerInput['source'] ?? ''),
+		]);
+
+		$_SESSION[self::SESSION_KEY] = $metaArr;
+
+		return $this->fromArray($metaArr);
 
 		return $meta;
 	}
