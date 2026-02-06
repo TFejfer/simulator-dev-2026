@@ -1,0 +1,33 @@
+.process-aspect-ratio-box {
+    position: relative;
+    width: 80%;
+    max-width: 960px;
+    aspect-ratio: 16 / 9;
+    background: #ccc;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    overflow: hidden;
+}
+
+.process-video-outer {
+    display: flex;
+    justify-content: center;
+}
+
+.process-video {
+    width: 100%;
+    max-width: 640px;
+}
+
+.process-diagram {
+    display: flex;
+    justify-content: center;
+    margin-top: 2em;
+}
+
+.process-diagram-img {
+    max-width: 480px;
+}

@@ -6,6 +6,8 @@ window.__PROBLEM_FORMS_READY_PROMISE__ = new Promise((resolve) => {
 });
 
 const V = window.__ASSET_VER__ || String(Date.now());
+const debugEnabled = window.SIM_DEBUG?.enabled?.() || /[?&]debug(=|&|$)/i.test(String(window.location.search || ''));
+const dlog = (...args) => { if (debugEnabled) console.log('[bundle]', ...args); };
 const reg = window.problemFormsRegistry;
 if (!reg) throw new Error('[bundle] problemFormsRegistry missing');
 
@@ -48,4 +50,4 @@ if (typeof window.__PROBLEM_FORMS_READY_RESOLVE__ === 'function') {
 	window.__PROBLEM_FORMS_READY_RESOLVE__(true);
 }
 
-console.log('[bundle] problem/kt loaded');
+dlog('problem/kt loaded');

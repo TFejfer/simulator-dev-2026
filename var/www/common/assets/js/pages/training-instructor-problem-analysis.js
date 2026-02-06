@@ -5,7 +5,11 @@
 (() => {
 	'use strict';
 
-	console.log('[analysis] page script loaded');
+	const debugEnabled = window.SIM_DEBUG?.enabled?.() || /[?&]debug(=|&|$)/i.test(String(window.location.search || ''));
+	const dlog = (...args) => { if (debugEnabled) console.log('[analysis]', ...args); };
+	const dwarn = (...args) => { if (debugEnabled) console.warn('[analysis]', ...args); };
+
+	dlog('page script loaded');
 
 	if (!document.getElementById('page-data')) {
 		console.error('[analysis] missing #page-data script tag');
@@ -52,7 +56,7 @@
 
 	const EXERCISE_META = PAGE?.DATA?.EXERCISE_META || null;
 	if (!EXERCISE_META) console.error('[analysis] missing EXERCISE_META in page-data');
-	console.log('[analysis] EXERCISE_META', EXERCISE_META);
+	dlog('EXERCISE_META', EXERCISE_META);
 
 	// Local runtime store payload (keep keys aligned with backend contract)
 	const EXERCISE_DATA = {
@@ -123,13 +127,13 @@
 		});
 
 		if (!res?.ok) {
-			console.warn('[analysis] static content load failed', res);
+			dwarn('static content load failed', res);
 			return null;
 		}
 
 		exerciseStaticContent = res.data || null;
 		window.ProblemExerciseStaticContent = exerciseStaticContent;
-		console.log('[analysis] static content loaded', exerciseStaticContent);
+		dlog('static content loaded', exerciseStaticContent);
 		return exerciseStaticContent;
 	};
 
@@ -145,13 +149,13 @@
 		});
 
 		if (!res?.ok) {
-			console.warn('[analysis] state content load failed', res);
+			dwarn('state content load failed', res);
 			return null;
 		}
 
 		exerciseStateContent = res.data || null;
 		window.ProblemExerciseStateContent = exerciseStateContent;
-		console.log('[analysis] state content loaded', exerciseStateContent);
+		dlog('state content loaded', exerciseStateContent);
 		return exerciseStateContent;
 	};
 
@@ -164,7 +168,7 @@
 		const res = await simulatorAjaxRequest('/ajax/problem/exercise/state.php', 'POST', scope);
 
 		if (!res?.ok) {
-			console.warn('[analysis] state load failed', res);
+			dwarn('state load failed', res);
 			return;
 		}
 
@@ -201,7 +205,7 @@
 			store.get().case.visibility = data.case.visibility;
 		}
 
-		console.log('[analysis] state refreshed');
+		dlog('state refreshed');
 	};
 
 	// ------------------------------------------------------------
@@ -211,7 +215,7 @@
 		id: 'training-instructor-problem-analysis',
 
 		blocking: async () => {
-			console.log('[analysis] blocking entered');
+			dlog('blocking entered');
 
 			$('#display_content').html(`
 				<div id="problem_analysis_layout">
@@ -236,7 +240,10 @@
 			}
 
 						// Static content first (needed for CI lookups etc.)
-			await loadExerciseStaticContent();
+						await loadExerciseStaticContent();
+						if (window.ProblemInfoSidebar?.prepare) {
+							try { window.ProblemInfoSidebar.prepare(); } catch {}
+						}
 
 			// Render-throttle for incremental module arrivals (must be set BEFORE bundle finishes).
 			let renderTimer = null;
@@ -279,14 +286,20 @@
 			if (window.HelpSidebar?.bindCloseButton) {
 				window.HelpSidebar.bindCloseButton();
 			}
+			if (window.ProblemInfoSidebar?.bindCloseButton) {
+				window.ProblemInfoSidebar.bindCloseButton();
+			}
 			// Do NOT bind forms here; we bind once after bundle is ready in blocking().
 		},
 
 		background: async () => {
 			try {
 				await loadExerciseStateContent();
+				if (window.ProblemInfoSidebar?.prepare) {
+					try { window.ProblemInfoSidebar.prepare(); } catch {}
+				}
 			} catch (e) {
-				console.warn('[analysis] background content load failed', e);
+				dwarn('background content load failed', e);
 			}
 		}
 	});

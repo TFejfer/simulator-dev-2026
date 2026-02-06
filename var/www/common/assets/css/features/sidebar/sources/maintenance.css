@@ -1,0 +1,51 @@
+.grid-maintenance {
+	display: grid;
+	grid-template-columns: minmax(400px, 1fr);
+	grid-template-rows: minmax(40px, auto) minmax(100px, 380px);
+	grid-column-gap: 20px;
+	margin: 10px;
+	grid-template-areas:
+		"mai-title"
+		"mai-content"
+}
+.simulator-info-source[data-code="mai"] {
+	box-sizing: border-box; /* include padding in height calc to avoid outer scroll */
+	overflow-y: hidden; /* keep outer from scrolling; inner content handles its own scroll */
+}
+.mai-title {
+	grid-area: mai-title;
+	margin-bottom: 20px;
+}
+.mai-content {
+	grid-area: mai-content;
+	overflow-x: hidden;
+	overflow-y: hidden;
+	height: calc(100vh - 200px);
+}
+
+#maintenanceTable {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#maintenanceTable th, #maintenanceTable td {
+    padding: 8px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+#maintenanceTable th {
+    background-color: #f2f2f2;
+}
+
+.maintenance-center {
+    text-align: center;
+}
+
+.maintenance-left {
+    text-align: left;
+}
+
+#maintenanceTable td {
+    vertical-align: top;
+}

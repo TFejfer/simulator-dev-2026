@@ -48,6 +48,7 @@ final class MaintenanceInfoSourceBuilder
                 'time_end'   => ($r['time_end'] ?? null) !== null ? (string)$r['time_end'] : null,
                 // From SQL DATE_SUB(CURDATE(), INTERVAL days_back DAY)
                 'item_date'  => (string)($r['item_date'] ?? ''),
+                'is_monthly' => $sentenceId === 72 ? true : false,
             ];
         }
 

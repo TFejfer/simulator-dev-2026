@@ -168,4 +168,22 @@
   window.simulatorTerm = (id, bucket = 'common', fallback = '') =>
     window.simulatorTerms.term(id, bucket, fallback);
 
+  // Global DataTables language helper using the loaded common terms bucket.
+  const datatableTerms = () => {
+    const t = typeof window.simulatorTerm === 'function'
+      ? (id, fallback = '') => window.simulatorTerm(id, 'common', fallback)
+      : (_id, fallback = '') => fallback;
+
+    return {
+      search: t(431, 'Search'),
+      info: `${t(432, 'Showing')} _TOTAL_ ${t(433, 'entries')}`,
+      emptyTable: t(434, 'No data available'),
+      infoEmpty: t(437, 'No entries'),
+      infoFiltered: `(${t(436, 'Filtered from')} _MAX_ ${t(433, 'entries')})`,
+      zeroRecords: t(434, 'No matching records'),
+    };
+  };
+
+  window.datatableTerms = datatableTerms;
+
 })();

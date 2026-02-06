@@ -109,7 +109,13 @@ if (!empty($customScriptArr['problem-common'])) {
     echo $css('/common/assets/css/problem-common.css');
 }
 if (!empty($customScriptArr['problem-information-sources'])) {
-    echo $css('/common/assets/css/problem-information-sources.css');
+    echo $css('/common/assets/css/features/sidebar/sources/sources-shared.css');
+    echo $css('/common/assets/css/features/sidebar/sources/inbox.css');
+    echo $css('/common/assets/css/features/sidebar/sources/process.css');
+    echo $css('/common/assets/css/features/sidebar/sources/maintenance.css');
+    echo $css('/common/assets/css/features/sidebar/sources/performance.css');
+    echo $css('/common/assets/css/features/sidebar/sources/system-log.css');
+    echo $css('/common/assets/css/features/sidebar/sources/inspect-and-act.css');
 }
 if (!empty($customScriptArr['problem-introduction'])) {
     echo $css('/common/assets/css/problem-introduction.css');

@@ -592,6 +592,73 @@ final class ProblemInfoSourceRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
+    public function readCiDescriptionTexts(int $themeId, string $languageCode): array
+    {
+        $stmt = $this->dbProblemContent->prepare("
+            SELECT
+				m.type_id AS ci_type_id,
+                COALESCE(NULLIF(TRIM(t.translated_text), ''), m.source_text) AS ci_text,
+                m.sequence_no
+            FROM cis_in_themes cit
+            JOIN i18n_ci_description_master m
+                ON m.type_id = cit.ci_type_id
+            LEFT JOIN i18n_ci_description_translations t
+                ON t.master_id = m.id
+            AND t.language_code = :language_code
+            WHERE cit.theme_id = :theme_id;
+        ");
+
+        $stmt->execute([
+            ':theme_id'      => $themeId,
+            ':language_code' => $languageCode,
+        ]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function readCiActionBenefitTexts(int $themeId, string $languageCode): array
+    {
+        $stmt = $this->dbProblemContent->prepare("
+            SELECT
+				m.type_id AS ci_type_id, m.action_id,
+                COALESCE(NULLIF(TRIM(t.translated_text), ''), m.source_text) AS text,
+                m.sequence_no
+            FROM cis_in_themes cit
+            JOIN i18n_ci_action_benefit_master m
+                ON m.type_id = cit.ci_type_id
+            LEFT JOIN i18n_ci_action_benefit_translations t
+                ON t.master_id = m.id
+            AND t.language_code = :language_code
+            WHERE cit.theme_id = :theme_id;
+        ");
+
+        $stmt->execute([
+            ':theme_id'      => $themeId,
+            ':language_code' => $languageCode,
+        ]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+
+    public function readCiActionCostAndTime(int $themeId): array
+    {
+        $stmt = $this->dbProblemContent->prepare("
+            SELECT
+                tac.ci_type_id, tac.action_id, tac.cost, tac.time_min
+            FROM cis_in_themes cit
+            JOIN problem_ci_action_time_and_cost tac
+                ON tac.ci_type_id = cit.ci_type_id
+            WHERE cit.theme_id = :theme_id;
+        ");
+
+        $stmt->execute([
+            ':theme_id'      => $themeId,
+        ]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
     /* ============================================================
        SMALL HELPERS
        ============================================================ */

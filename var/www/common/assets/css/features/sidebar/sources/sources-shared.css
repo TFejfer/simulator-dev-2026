@@ -1,0 +1,9 @@
+.reload-text {
+	text-align: right;
+	font-size: 80%;
+}
+
+.std-link {
+	cursor: pointer;
+	color: var(--main-button-color);
+}

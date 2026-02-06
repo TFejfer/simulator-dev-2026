@@ -1,0 +1,30 @@
+.inbox-container {
+    display: flex;
+    justify-content: center;
+}
+
+.inbox-message {
+    max-width: 600px;
+    min-width: 400px;
+    padding: 40px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.inbox-header-container {
+    display: grid;
+    grid-template-columns: 1fr auto;
+}
+
+.inbox-header-to {
+    text-align: left;
+}
+
+.inbox-header-date {
+    text-align: right;
+}
+
+.inbox-subject {
+    font-weight: bold;
+    margin: 40px 0 20px 0;
+}

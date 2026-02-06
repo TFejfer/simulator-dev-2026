@@ -21,7 +21,7 @@ final class ThemeConfigurationItems
 				cit.ci_type_id,
                 CONCAT(cit.ci_type_id, COALESCE(cit.ci_suffix, '')) AS ci_id,
                 COALESCE(NULLIF(TRIM(t.translated_text), ''), m.source_text) AS ci_text,
-                m.is_possible_cause
+                m.is_possible_cause, m.has_multiple_images
             FROM cis_in_themes cit
             JOIN i18n_configuration_item_types_master m
                 ON m.key_code = cit.ci_type_id

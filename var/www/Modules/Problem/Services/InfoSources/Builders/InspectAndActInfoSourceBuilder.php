@@ -52,6 +52,12 @@ final class InspectAndActInfoSourceBuilder
             ':theme_id' => $k->themeId,
         ]);
 
+        // 6) CI descriptions
+        $ciDescriptions = $this->repo->readCiDescriptionTexts($k->themeId, $k->languageCode);
+
+        // 7) CI action benefits
+        $ciActionBenefits = $this->repo->readCiActionBenefitTexts($k->themeId, $k->languageCode);
+
         return [
             'webrotateXmlFolder'   => $webrotateXmlFolder,
             'webrotateXmlFileName' => $webrotateXmlFileName,
@@ -60,6 +66,8 @@ final class InspectAndActInfoSourceBuilder
                 'port_code'       => (string)$r['port_code'],
                 'connected_ci_id' => (string)$r['connected_ci_id'],
             ], $rows),
+            'ci_descriptions' => $ciDescriptions,
+            'ci_action_benefits' => $ciActionBenefits,
         ];
     }
 }

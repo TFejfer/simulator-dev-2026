@@ -130,12 +130,24 @@ $_SERVER['APP_PAGE_KEY'] = $ctxKey;
 
 $pageScript = "/common/assets/js/pages/{$ctxKey}.js";
 
+$assets['libs']['imagerotator'] = true;
+
 // Forms - core (always)
 $assets['js'][] = '/common/assets/js/features/problem/forms/helpers.js';
 $assets['js'][] = '/common/assets/js/features/problem/forms/store.js';
 $assets['js'][] = '/common/assets/js/features/problem/forms/forms-controller.js';
 $assets['js'][] = '/common/assets/js/features/problem/forms/forms-layout.js';
 $assets['js'][] = '/common/assets/js/features/problem/forms/forms-registry.js';
+$assets['js'][] = '/common/assets/js/features/sidebar/help-sidebar.js';
+$assets['js'][] = '/common/assets/js/features/sidebar/problem-info-sources-registry.js';
+$assets['js'][] = '/common/assets/js/features/sidebar/sources/utils.js';
+$assets['js'][] = '/common/assets/js/features/sidebar/sources/inbox.js';
+$assets['js'][] = '/common/assets/js/features/sidebar/sources/process.js';
+$assets['js'][] = '/common/assets/js/features/sidebar/sources/maintenance.js';
+$assets['js'][] = '/common/assets/js/features/sidebar/sources/performance.js';
+$assets['js'][] = '/common/assets/js/features/sidebar/sources/system-log.js';
+$assets['js'][] = '/common/assets/js/features/sidebar/sources/inspect-and-act.js';
+$assets['js'][] = '/common/assets/js/features/sidebar/problem-info-sidebar.js';
 
 // Forms - template bundle (single entrypoint)
 // NOTE: This file should register the concrete forms for the chosen template.
@@ -143,6 +155,8 @@ $assets['js'][] = '/common/assets/js/features/problem/forms/forms-registry.js';
 
 // (Optional) template CSS (if you implement it)
 //$assets['css'][] = "/common/assets/css/features/problem/forms/{$templateCode}.css";
+
+$assets['modules']['problem-information-sources'] = true;
 
 // ------------------------------------------------------------
 // 7) Page class
