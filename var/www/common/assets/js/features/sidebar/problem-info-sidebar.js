@@ -150,6 +150,18 @@
 			return false;
 		}
 
+		// Close action modal when switching info source (avoid stale overlay)
+		if ($) {
+			const $actModal = $('#simulator_modal_act');
+			if ($actModal.length) {
+				$actModal
+					.removeClass('simulator-show')
+					.attr('aria-hidden', 'true')
+					.css('display', 'none');
+				$('body').removeClass('modal-open');
+			}
+		}
+
 		if (!prepared) prepare();
 		if (!mounted) mountAll();
 
