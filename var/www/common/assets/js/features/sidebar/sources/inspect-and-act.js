@@ -1116,17 +1116,46 @@
 	const showHideModal = (id, show = true) => {
 		const $m = $ && $(`#${id}`);
 		if (!$m || !$m.length) return;
+		const el = $m.get(0);
+
 		if (show) {
-			$m.addClass('simulator-show').css('display', 'block');
+			if (el._iaaHideTimer) {
+				clearTimeout(el._iaaHideTimer);
+				el._iaaHideTimer = null;
+			}
+
+			$m.css('display', 'block');
 			$m.attr('aria-hidden', 'false');
 			$('body').addClass('modal-open');
+			// Force a reflow so transitions can run, then add show class next frame
+			void el.offsetWidth;
+			requestAnimationFrame(() => {
+				$m.addClass('simulator-show');
+			});
 			log('modal show', { id });
-		} else {
-			$m.removeClass('simulator-show').css('display', 'none');
-			$m.attr('aria-hidden', 'true');
-			$('body').removeClass('modal-open');
-			log('modal hide', { id });
+			return;
 		}
+
+		const finalizeHide = () => {
+			$m.css('display', 'none');
+			el.removeEventListener('transitionend', onTransitionEnd);
+			if (el._iaaHideTimer) {
+				clearTimeout(el._iaaHideTimer);
+				el._iaaHideTimer = null;
+			}
+		};
+
+		const onTransitionEnd = (e) => {
+			if (e.target !== el) return;
+			finalizeHide();
+		};
+
+		$m.removeClass('simulator-show');
+		$m.attr('aria-hidden', 'true');
+		$('body').removeClass('modal-open');
+		el.addEventListener('transitionend', onTransitionEnd);
+		el._iaaHideTimer = setTimeout(finalizeHide, 550);
+		log('modal hide', { id });
 	};
 
 
