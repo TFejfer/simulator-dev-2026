@@ -95,6 +95,65 @@ final class ExerciseRuntimeRepository
 	}
 
 	/**
+	 * Count actions logged for a specific outline in this access/team scope.
+	 */
+	public function getMaxActions(int $accessId, int $outlineId, int $teamNo): int
+	{
+		if ($accessId <= 0 || $teamNo <= 0 || $outlineId <= 0) return 0;
+
+		try {
+			$stmt = $this->dbRuntime->prepare("
+				SELECT COUNT(*) AS row_count
+				FROM log_exercise
+				WHERE access_id  = :access_id
+				  AND outline_id = :outline_id
+				  AND team_no    = :team_no
+				  AND ci_id IS NOT NULL
+			");
+			$stmt->execute([
+				':access_id' => $accessId,
+				':outline_id' => $outlineId,
+				':team_no' => $teamNo,
+			]);
+
+			$row = $stmt->fetch(PDO::FETCH_ASSOC);
+			return (int)($row['row_count'] ?? 0);
+		} catch (Throwable) {
+			return 0;
+		}
+	}
+
+	/**
+	 * Earliest log_exercise row timestamp for an outline (used as timer anchor).
+	 */
+	public function findExerciseStartTime(int $accessId, int $outlineId, int $teamNo): ?int
+	{
+		if ($accessId <= 0 || $teamNo <= 0 || $outlineId <= 0) return null;
+
+		try {
+			$stmt = $this->dbRuntime->prepare("
+				SELECT UNIX_TIMESTAMP(created_at) AS epochStartTime
+				FROM log_exercise
+				WHERE access_id = :access_id
+				  AND team_no   = :team_no
+				  AND outline_id = :outline_id
+				ORDER BY id ASC
+				LIMIT 1
+			");
+			$stmt->execute([
+				':access_id' => $accessId,
+				':team_no'   => $teamNo,
+				':outline_id' => $outlineId,
+			]);
+
+			$row = $stmt->fetch(PDO::FETCH_ASSOC);
+			return $row !== false ? (int)$row['epochStartTime'] : null;
+		} catch (Throwable) {
+			return null;
+		}
+	}
+
+	/**
 	 * Returns max step_no per outline_id (for a list of outline IDs).
 	 *
 	 * @return array<int,int> map outline_id => max_step_no
@@ -179,6 +238,7 @@ final class ExerciseRuntimeRepository
 	 * Inserts the first log_exercise row for a new exercise run.
 	 * Returns inserted id (0 on failure).
 	 */
+	/*
 	public function insertFirstEntry(array $row): int
 	{
 		try {
@@ -209,6 +269,7 @@ final class ExerciseRuntimeRepository
 			return 0;
 		}
 	}
+	*/
 
 	/**
 	 * Inserts a generic log_exercise row (used for server-side transitions like times-up).
@@ -219,9 +280,9 @@ final class ExerciseRuntimeRepository
 		try {
 			$stmt = $this->dbRuntime->prepare("
 				INSERT INTO log_exercise
-					(access_id, team_no, outline_id, skill_id, exercise_no, theme_id, scenario_id, format_id, step_no, current_state, next_state, actor_token, actor_name, include_in_poll)
+					(access_id, team_no, outline_id, skill_id, exercise_no, theme_id, scenario_id, format_id, step_no, current_state, next_state, actor_token, actor_name, include_in_poll, ci_id, action_id, time_min, cost, risk, outcome_id, action_type_id)
 				VALUES
-					(:access_id, :team_no, :outline_id, :skill_id, :exercise_no, :theme_id, :scenario_id, :format_id, :step_no, :current_state, :next_state, :actor_token, :actor_name, :include_in_poll)
+					(:access_id, :team_no, :outline_id, :skill_id, :exercise_no, :theme_id, :scenario_id, :format_id, :step_no, :current_state, :next_state, :actor_token, :actor_name, :include_in_poll, :ci_id, :action_id, :time_min, :cost, :risk, :outcome_id, :action_type_id)
 			");
 
 			$stmt->execute([
@@ -234,11 +295,18 @@ final class ExerciseRuntimeRepository
 				':scenario_id' => (int)$row['scenario_id'],
 				':format_id' => (int)$row['format_id'],
 				':step_no' => (int)$row['step_no'],
-				':current_state' => $row['current_state'],
-				':next_state' => $row['next_state'],
-				':actor_token' => (string)$row['actor_token'],
-				':actor_name' => (string)$row['actor_name'],
+				':current_state' => isset($row['current_state']) ? (int)$row['current_state'] : null,
+				':next_state' => isset($row['next_state']) ? (int)$row['next_state'] : null,
+				':ci_id' => isset($row['ci_id']) ? (string)$row['ci_id'] : null,
+				':action_id' => isset($row['action_id']) ? (int)$row['action_id'] : null,
+				':time_min' => isset($row['time_min']) ? (int)$row['time_min'] : null,
+				':cost' => isset($row['cost']) ? (int)$row['cost'] : null,
+				':risk' => isset($row['risk']) ? (int)$row['risk'] : null,
+				':outcome_id' => isset($row['outcome_id']) ? (int)$row['outcome_id'] : null,
+				':action_type_id' => isset($row['action_type_id']) ? (int)$row['action_type_id'] : null,
 				':include_in_poll' => isset($row['include_in_poll']) ? (int)$row['include_in_poll'] : 1,
+				':actor_token' => isset($row['actor_token']) ? (string)$row['actor_token'] : null,
+				':actor_name' => isset($row['actor_name']) ? (string)$row['actor_name'] : null,
 			]);
 
 			return (int)$this->dbRuntime->lastInsertId();

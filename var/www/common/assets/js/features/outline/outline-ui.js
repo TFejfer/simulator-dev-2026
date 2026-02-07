@@ -138,15 +138,52 @@
 	let uiTickHandle = null;
 
 	const getDom = (exerciseNo) => {
-		if (dom.has(exerciseNo)) return dom.get(exerciseNo);
+		const inDom = (el) => {
+			if (!el) return false;
+			try { return document.body.contains(el); } catch { return false; }
+		};
 
-		const markEl = document.getElementById(`mark${exerciseNo}`);
-		const lockEl = document.getElementById(`lock${exerciseNo}`);
-		const itemEl = document.querySelector(`.grid-outline-item[data-item="exercise"][data-exercise="${exerciseNo}"]`);
-		const lockCellEl = itemEl ? itemEl.querySelector('.outline-item-lock') : null;
+		const existing = dom.get(exerciseNo);
+		let didRefresh = false;
 
-		const rec = { markEl, lockEl, itemEl, lockCellEl };
-		dom.set(exerciseNo, rec);
+		// If we have a cached record but the nodes were not present yet (or got replaced), re-query.
+		if (existing) {
+			if (existing.markEl && !inDom(existing.markEl)) existing.markEl = null;
+			if (existing.lockEl && !inDom(existing.lockEl)) existing.lockEl = null;
+			if (existing.itemEl && !inDom(existing.itemEl)) existing.itemEl = null;
+			if (existing.lockCellEl && !inDom(existing.lockCellEl)) existing.lockCellEl = null;
+
+			const hadMissing = (!existing.markEl || !existing.lockEl || !existing.itemEl);
+			if (!hadMissing) return existing;
+		}
+
+		const markEl = (existing && existing.markEl) ? existing.markEl : document.getElementById(`mark${exerciseNo}`);
+		const lockEl = (existing && existing.lockEl) ? existing.lockEl : document.getElementById(`lock${exerciseNo}`);
+		const itemEl = (existing && existing.itemEl)
+			? existing.itemEl
+			: document.querySelector(`.grid-outline-item[data-item="exercise"][data-exercise="${exerciseNo}"]`);
+		const lockCellEl = (existing && existing.lockCellEl)
+			? existing.lockCellEl
+			: (itemEl ? itemEl.querySelector('.outline-item-lock') : null);
+
+		let rec = existing;
+		if (!rec) {
+			rec = { markEl, lockEl, itemEl, lockCellEl };
+			dom.set(exerciseNo, rec);
+			return rec;
+		}
+
+		// Update cached record in-place.
+		if (!rec.markEl && markEl) { rec.markEl = markEl; didRefresh = true; }
+		if (!rec.lockEl && lockEl) { rec.lockEl = lockEl; didRefresh = true; }
+		if (!rec.itemEl && itemEl) { rec.itemEl = itemEl; didRefresh = true; }
+		if (!rec.lockCellEl && lockCellEl) { rec.lockCellEl = lockCellEl; didRefresh = true; }
+
+		// If DOM references were missing and are now available, force next apply even if max_step didn't change.
+		if (didRefresh) {
+			lastMaxStep.delete(exerciseNo);
+		}
+
 		return rec;
 	};
 

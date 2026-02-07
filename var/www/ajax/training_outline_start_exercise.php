@@ -138,7 +138,7 @@ try {
 		$nextState = 11;
 	}
 
-	$insertId = $runtimeRepo->insertFirstEntry([
+	$insertId = $runtimeRepo->insertStep([
 		'access_id' => $accessId,
 		'team_no' => $teamNo,
 		'outline_id' => $outlineId,

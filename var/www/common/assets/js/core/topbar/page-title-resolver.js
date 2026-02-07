@@ -19,6 +19,7 @@
 	const registry = Object.freeze({
 		'training-instructor-setup': { term_id: 539 },
 		'training-instructor-outline': { term_id: 306 },
+		'training-problem-instructor-analysis': { term_id: 561 },
 		'training-instructor-results': { term_id: 562 },
 		'training-instructor-result': { term_id: 107 },
 	});

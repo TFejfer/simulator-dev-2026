@@ -37,6 +37,17 @@
     return { ok: true, data: payload, error: null };
   };
 
+  const safeParseBody = async (res) => {
+    const contentType = res.headers.get('Content-Type') || '';
+    try {
+      if (contentType.includes('application/json')) return await res.json();
+      return await res.text();
+    } catch (e) {
+      // If parsing fails (invalid JSON / empty body), return null
+      return null;
+    }
+  };
+
   /**
    * simulatorAjaxRequest(url, method, body, options)
    *
@@ -106,6 +117,8 @@
         signal: controller.signal
       });
 
+      const requestId = res.headers.get('X-Request-Id') || '';
+
       // 304 => return from cache (cache mode only)
       if (res.status === 304 && mode === 'cache') {
         const cached = cacheStore.get(cacheKey);
@@ -117,7 +130,21 @@
 
       if (!res.ok) {
         // Do not throw, return structured error
-        return { ok: false, status: res.status, data: null, error: `http_${res.status}`, fromCache: false };
+        // Try to parse backend payload so callers can show meaningful messages.
+        const payload = await safeParseBody(res);
+        const normalized = normalizePayload(payload);
+        return {
+          ok: false,
+          status: res.status,
+          data: normalized.data,
+          error: normalized.error || `http_${res.status}`,
+          fromCache: false,
+          request_id: (normalized?.data && typeof normalized.data === 'object' && normalized.data.request_id)
+            ? normalized.data.request_id
+            : (payload && typeof payload === 'object' && payload.request_id)
+              ? payload.request_id
+              : requestId
+        };
       }
 
       const contentType = res.headers.get('Content-Type') || '';
@@ -134,7 +161,8 @@
         status: res.status,
         data: normalized.data,
         error: normalized.error,
-        fromCache: false
+        fromCache: false,
+        request_id: requestId
       };
 
       // Store cache only in cache mode + ok + has ETag

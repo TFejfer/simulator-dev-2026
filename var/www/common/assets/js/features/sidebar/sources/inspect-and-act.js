@@ -573,7 +573,7 @@
 	const showActionGuardError = (message) => {
 		if (typeof window.simulatorShowConfirm === 'function') {
 			window.simulatorShowConfirm({
-				title: term(82, 'Notice'),
+				title: term(214, 'Notification'),
 				content: message,
 				backgroundDismiss: true
 			});
@@ -583,18 +583,57 @@
 	const problemLogPerformedAction = async (ciId, actionId, ctx) => {
 		if (typeof window.simulatorAjaxRequest !== 'function') return false;
 		const ex = ctx?.exercise || {};
+		const meta = resolveExerciseMeta(ctx);
 		const params = {
-			ciID: String(ciId ?? ''),
-			actionID: Number(actionId || 0),
+			ci_id: String(ciId ?? ''),
+			action_id: Number(actionId || 0),
 			outline_id: Number(ex.outline_id ?? ex.outlineId ?? 0),
-			exercise_no: Number(ex.exercise_no ?? ex.exerciseNo ?? 0),
-			theme_id: Number(ex.theme_id ?? ex.themeId ?? 0),
-			scenario_id: Number(ex.scenario_id ?? ex.scenarioId ?? 0)
+			step_no: Number(meta.stepNo || 0),
+			current_state: Number(meta.currentState || 0)
 		};
 
-		const res = await window.simulatorAjaxRequest('/ajax/problem_action_log.php', 'POST', params, { mode: 'dynamic' });
+		const res = await window.simulatorAjaxRequest('/ajax/log_problem_action.php', 'POST', params, { mode: 'dynamic' });
 		if (res?.ok) return true;
-		const errMsg = String(res?.error || res?.errorMsg || 'Action could not be registered.');
+		let errMsg = String(res?.error || res?.errorMsg || 'Action could not be registered.');
+
+		// If backend returned diagnostics, surface them (escaped) to avoid blind guessing.
+		if (res?.data && typeof res.data === 'object') {
+			const details = [];
+			if (Number.isFinite(Number(res.data.skill_id))) details.push(`skill_id=${esc(res.data.skill_id)}`);
+			if (Number.isFinite(Number(res.data.format_id))) details.push(`format_id=${esc(res.data.format_id)}`);
+			if (Number.isFinite(Number(res.data.step_no))) details.push(`step_no=${esc(res.data.step_no)}`);
+			if (typeof res.data.policy_found !== 'undefined') details.push(`policy_found=${esc(res.data.policy_found)}`);
+			if (typeof res.data.is_action_allowed !== 'undefined') details.push(`is_action_allowed=${esc(res.data.is_action_allowed)}`);
+			if (Array.isArray(res.data.available_formats)) details.push(`available_formats_count=${esc(res.data.available_formats.length)}`);
+			if (Array.isArray(res.data.available_steps)) details.push(`available_steps_count=${esc(res.data.available_steps.length)}`);
+			if (Array.isArray(res.data.drilldown_errors) && res.data.drilldown_errors.length) details.push(`drilldown_errors=${esc(res.data.drilldown_errors.join(' | '))}`);
+			if (res.data.db_info && typeof res.data.db_info === 'object') {
+				const di = res.data.db_info;
+				if (di.database) details.push(`db=${esc(di.database)}`);
+				if (di.hostname) details.push(`db_host=${esc(di.hostname)}`);
+				if (typeof di.row_exists !== 'undefined' && di.row_exists !== null) details.push(`row_exists=${esc(di.row_exists)}`);
+				if (typeof di.rows_for_skill !== 'undefined' && di.rows_for_skill !== null) details.push(`rows_for_skill=${esc(di.rows_for_skill)}`);
+				if (typeof di.rows_for_skill_format !== 'undefined' && di.rows_for_skill_format !== null) details.push(`rows_for_skill_format=${esc(di.rows_for_skill_format)}`);
+			}
+
+			if (details.length) {
+				errMsg += `\nDetails: ${details.join(', ')}`;
+			}
+
+			// Preview steps (first 10) if provided
+			if (Array.isArray(res.data.available_steps) && res.data.available_steps.length) {
+				const preview = res.data.available_steps
+					.slice(0, 10)
+					.map((r) => `${esc(r?.step_no)}:${esc(r?.is_action_allowed)}`)
+					.join(', ');
+				errMsg += `\nSteps preview: ${preview}${res.data.available_steps.length > 10 ? ', ...' : ''}`;
+			}
+		}
+
+		if (res?.request_id) {
+			errMsg += `\nrequest_id: ${esc(res.request_id)}`;
+		}
+
 		showActionGuardError(errMsg);
 		return false;
 	};
@@ -1360,22 +1399,33 @@
 
 					const removeHotspots = () => {
 						const exercise = ctx?.exercise || {};
+						const meta = resolveExerciseMeta(ctx);
 						const info = exercise?.infoSrc?.webrotate || {};
-						const paceId = ctx?.delivery?.paceID || ctx?.delivery?.paceId || ctx?.delivery?.pace_id;
+						const paceId = Number(ctx?.delivery?.paceID ?? ctx?.delivery?.paceId ?? ctx?.delivery?.pace_id ?? 0) || 0;
+						const stepNo = Number(meta.stepNo || 0) || 0;
+						const formatId = Number(meta.formatId || 0) || 0;
 
-						if (info.showHotSpots === false || exercise.step === 80) {
+						if (info.showHotSpots === false || stepNo === 80) {
 							$('.wr360rollover_wr360PlayerId').remove();
 						}
 
-						if ((exercise.format === 2 && exercise.step < 50) || (exercise.format === 4 && exercise.step === 20)) {
+						if (formatId === 2 && stepNo === 20) {
+							$('.wr360rollover_wr360PlayerId').not('.11O_rollover').remove();
+						}
+
+						if (formatId === 2 && stepNo > 20 && stepNo < 50) {
 							$('.wr360rollover_wr360PlayerId').not('.11O_rollover, .12O_rollover').remove();
 						}
 
-						if ((exercise.format === 4 || exercise.format === 11) && exercise.step > 30 && exercise.step < 80) {
+						if (formatId === 4 && stepNo === 20) {
+							$('.wr360rollover_wr360PlayerId').not('.11O_rollover, .12O_rollover').remove();
+						}
+
+						if ((formatId === 4 || formatId === 11) && stepNo > 30 && stepNo < 80) {
 							$('.wr360rollover_wr360PlayerId.12O_rollover').remove();
 						}
 
-						if (exercise.format === 10 && exercise.step === 27) {
+						if (formatId === 10 && stepNo === 27) {
 							$('#wr360HotspotsButton_wr360PlayerId').remove();
 						}
 

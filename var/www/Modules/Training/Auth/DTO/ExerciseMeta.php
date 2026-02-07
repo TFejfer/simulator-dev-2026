@@ -10,7 +10,7 @@ final class ExerciseMeta
         public int $accessId,
         public int $teamNo,
         public int $outlineId,
-        public ?int $skillId = null,
+        public ?int $skillId,
 
         // Latest exercise row fields
         public ?int $exerciseNo,
