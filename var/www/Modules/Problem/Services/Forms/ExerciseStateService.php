@@ -53,7 +53,7 @@ final class ExerciseStateService
 		int $formatId,
 		int $stepNo,
 		int $templateId,
-		int $numberOfCauses,
+		bool $hasMultipleCauses,
 		bool $hasCausality
 	): array {
 		$versions = $this->readVersions($accessId, $teamNo, $outlineId, $exerciseNo);
@@ -62,7 +62,7 @@ final class ExerciseStateService
 		$uiForms = $this->formRules->findFormsForStep($skillId, $formatId, $stepNo, $templateId);
 
 		// Runtime policy for iterations (may override or remove)
-		$iterMode = $this->computeIterationVisibility($stepNo, $numberOfCauses, $hasCausality);
+		$iterMode = $this->computeIterationVisibility($stepNo, $hasMultipleCauses, $hasCausality);
 
 		// Apply iterations policy to UI plan:
 		// - if hidden => remove from uiForms
@@ -223,13 +223,13 @@ final class ExerciseStateService
 	 * - 1 = enabled (editable)
 	 * - 3 = disabled (visible, locked)
 	 */
-	private function computeIterationVisibility(int $stepNo, int $numberOfCauses, bool $hasCausality): int
+	private function computeIterationVisibility(int $stepNo, bool $hasMultipleCauses, bool $hasCausality): int
 	{
 		// iterations only relevant from step 60
 		if ($stepNo < 60) return 0;
 
 		// only if at least 2 causes exist
-		if ($numberOfCauses < 2) return 0;
+		if (!$hasMultipleCauses) return 0;
 
 		// not if causality is enabled
 		if ($hasCausality) return 0;

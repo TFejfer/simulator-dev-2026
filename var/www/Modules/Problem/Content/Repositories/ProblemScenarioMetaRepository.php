@@ -11,20 +11,23 @@ use PDO;
  * Reads scenario design meta from PROBLEM_CONTENT.
  *
  * Derivations (by theme_id + scenario_id):
- * - number_of_causes:
- *     2 if ANY row exists in problem_ci_action_next_state with current_state > 20, else 1.
+ * - has_multiple_causes:
+ *     true if ANY row exists in problem_ci_action_next_state with current_state > 20, else false.
  * - has_causality:
  *     true if ANY row exists in problem_scenario_causality for the pair, else false.
  *
  * Notes:
- * - has_causality is computed independently from number_of_causes to tolerate data inconsistencies.
+ * - has_causality is computed independently from has_multiple_causes to tolerate data inconsistencies.
  * - Repository uses in-request memoization (static cache) to avoid repeated DB hits.
  * - Optional APCu caching can be enabled if you want cross-request caching.
  */
 final class ProblemScenarioMetaRepository
 {
-    /** @var array<string, array{number_of_causes:int, has_causality:bool}> */
-    private static array $memo = [];
+    /** @var array<string,bool> */
+    private static array $memoHasMultipleCauses = [];
+
+    /** @var array<string,bool> */
+    private static array $memoHasCausality = [];
 
     public function __construct(
         private PDO $dbContent,
@@ -32,62 +35,35 @@ final class ProblemScenarioMetaRepository
         private int $apcuTtlSeconds = 300
     ) {}
 
-    /**
-     * @return array{number_of_causes:int, has_causality:bool}
-     */
-    public function getMeta(int $themeId, int $scenarioId): array
+    public function hasMultipleCauses(int $themeId, int $scenarioId): bool
     {
-        if ($themeId <= 0 || $scenarioId <= 0) {
-            // Fail-safe defaults
-            return [
-                'number_of_causes' => 1,
-                'has_causality'    => false,
-            ];
-        }
+        if ($themeId <= 0 || $scenarioId <= 0) return false;
 
         $key = $themeId . ':' . $scenarioId;
 
-        // In-request cache
-        if (isset(self::$memo[$key])) {
-            return self::$memo[$key];
+        if (isset(self::$memoHasMultipleCauses[$key])) {
+            return self::$memoHasMultipleCauses[$key];
         }
 
-        // Optional APCu cache (cross-request)
         if ($this->useApcu && function_exists('apcu_fetch')) {
-            $apcuKey = 'scenario_meta:' . $key;
+            $apcuKey = 'scenario_meta:has_multiple_causes:' . $key;
             $cached = apcu_fetch($apcuKey, $ok);
-            if ($ok && is_array($cached)
-                && isset($cached['number_of_causes'], $cached['has_causality'])
-            ) {
-                self::$memo[$key] = [
-                    'number_of_causes' => (int)$cached['number_of_causes'],
-                    'has_causality'    => (bool)$cached['has_causality'],
-                ];
-                return self::$memo[$key];
+            if ($ok && (is_bool($cached) || is_numeric($cached))) {
+                $val = is_bool($cached) ? $cached : ((int)$cached === 1);
+                self::$memoHasMultipleCauses[$key] = $val;
+                return self::$memoHasMultipleCauses[$key];
             }
         }
 
-        // Single query to compute both fields
         $stmt = $this->dbContent->prepare("
             SELECT
-                -- 2 causes if any current_state > 20 exists, else 1
                 CASE
-                    WHEN COALESCE(MAX(CASE WHEN ns.current_state > 20 THEN 1 ELSE 0 END), 0) = 1 THEN 2
-                    ELSE 1
-                END AS number_of_causes,
-
-                -- has_causality if a row exists in causality table
-                CASE
-                    WHEN COALESCE(MAX(CASE WHEN c.theme_id IS NOT NULL THEN 1 ELSE 0 END), 0) = 1 THEN 1
+                    WHEN COALESCE(MAX(CASE WHEN current_state > 20 THEN 1 ELSE 0 END), 0) = 1 THEN 1
                     ELSE 0
-                END AS has_causality
-
-            FROM problem_ci_action_next_state ns
-            LEFT JOIN problem_scenario_causality c
-                ON c.theme_id = ns.theme_id
-               AND c.scenario_id = ns.scenario_id
-            WHERE ns.theme_id = :theme_id
-              AND ns.scenario_id = :scenario_id
+                END AS has_multiple_causes
+            FROM problem_ci_action_next_state
+            WHERE theme_id = :theme_id
+              AND scenario_id = :scenario_id
         ");
 
         $stmt->execute([
@@ -96,27 +72,38 @@ final class ProblemScenarioMetaRepository
         ]);
 
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $result = ((int)($row['has_multiple_causes'] ?? 0) === 1);
 
-        // If the scenario has no rows in ns, we still want has_causality from causality table.
-        // Handle that with a cheap fallback exists-query.
-        if (!$row) {
-            $exists = $this->existsCausalityRow($themeId, $scenarioId);
-            $result = [
-                'number_of_causes' => 1,
-                'has_causality'    => $exists,
-            ];
-            self::$memo[$key] = $result;
-            $this->storeApcu($key, $result);
-            return $result;
+        self::$memoHasMultipleCauses[$key] = $result;
+        $this->storeApcuValue('scenario_meta:has_multiple_causes:' . $key, $result ? 1 : 0);
+
+        return $result;
+    }
+
+    public function hasCausality(int $themeId, int $scenarioId): bool
+    {
+        if ($themeId <= 0 || $scenarioId <= 0) return false;
+
+        $key = $themeId . ':' . $scenarioId;
+
+        if (isset(self::$memoHasCausality[$key])) {
+            return self::$memoHasCausality[$key];
         }
 
-        $result = [
-            'number_of_causes' => (int)($row['number_of_causes'] ?? 1),
-            'has_causality'    => ((int)($row['has_causality'] ?? 0) === 1),
-        ];
+        if ($this->useApcu && function_exists('apcu_fetch')) {
+            $apcuKey = 'scenario_meta:has_causality:' . $key;
+            $cached = apcu_fetch($apcuKey, $ok);
+            if ($ok && (is_bool($cached) || is_numeric($cached))) {
+                $val = is_bool($cached) ? $cached : ((int)$cached === 1);
+                self::$memoHasCausality[$key] = $val;
+                return self::$memoHasCausality[$key];
+            }
+        }
 
-        self::$memo[$key] = $result;
-        $this->storeApcu($key, $result);
+        $result = $this->existsCausalityRow($themeId, $scenarioId);
+
+        self::$memoHasCausality[$key] = $result;
+        $this->storeApcuValue('scenario_meta:has_causality:' . $key, $result ? 1 : 0);
 
         return $result;
     }
@@ -137,10 +124,9 @@ final class ProblemScenarioMetaRepository
         return (bool)$stmt->fetchColumn();
     }
 
-    /** @param array{number_of_causes:int, has_causality:bool} $result */
-    private function storeApcu(string $key, array $result): void
+    private function storeApcuValue(string $key, int $value): void
     {
         if (!$this->useApcu || !function_exists('apcu_store')) return;
-        apcu_store('scenario_meta:' . $key, $result, $this->apcuTtlSeconds);
+        apcu_store($key, $value, $this->apcuTtlSeconds);
     }
 }

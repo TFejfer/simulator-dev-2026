@@ -26,7 +26,9 @@ try {
 	// format/step come from exercise_meta (server truth)
 	$formatId = is_array($exerciseMeta) ? (int)($exerciseMeta['format_id'] ?? 0) : 0;
 	$stepNo = is_array($exerciseMeta) ? (int)($exerciseMeta['step_no'] ?? 0) : 0;
-	$numberOfCauses = is_array($exerciseMeta) ? (int)($exerciseMeta['number_of_causes'] ?? 0) : 0;
+	$hasMultipleCauses = is_array($exerciseMeta)
+		? (bool)($exerciseMeta['has_multiple_causes'] ?? false)
+		: false;
 	$hasCausality = is_array($exerciseMeta) ? ((bool)($exerciseMeta['has_causality'] ?? false)) : false;
 
 	$templateId = is_array($deliveryMeta) ? (int)($deliveryMeta['template_id'] ?? 0) : 0;
@@ -57,8 +59,8 @@ try {
 		$formatId,
 		$stepNo,
 		$templateId,
-		$numberOfCauses,
-		$hasCausality
+		(bool)$hasMultipleCauses,
+		(bool)$hasCausality
 	);
 
 	echo json_encode(['ok' => true, 'data' => $state, 'error' => null], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

@@ -35,6 +35,26 @@ final class CausesRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
+    public function countRows(int $accessId, int $teamNo, int $outlineId, int $exerciseNo): int
+    {
+        $stmt = $this->db->prepare("
+            SELECT COUNT(*) AS cnt
+            FROM problem_form_causes
+            WHERE access_id = :access_id
+              AND team_no = :team_no
+              AND outline_id = :outline_id
+              AND exercise_no = :exercise_no
+        ");
+        $stmt->execute([
+            ':access_id' => $accessId,
+            ':team_no' => $teamNo,
+            ':outline_id' => $outlineId,
+            ':exercise_no' => $exerciseNo,
+        ]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return (int)($row['cnt'] ?? 0);
+    }
+
     public function nextListNo(int $accessId, int $teamNo, int $outlineId, int $exerciseNo): int
     {
         $stmt = $this->db->prepare("

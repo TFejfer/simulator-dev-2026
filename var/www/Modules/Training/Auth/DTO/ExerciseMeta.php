@@ -29,7 +29,7 @@ final class ExerciseMeta
         public int $positionCount,
 
         // Causes and causality (optional defaults for robustness)
-        public ?int $numberOfCauses = null,
+        public ?bool $hasMultipleCauses = null,
         public ?bool $hasCausality = null,
 
         // Timer fields (optional)
@@ -67,8 +67,8 @@ final class ExerciseMeta
             'position_count'   => $this->positionCount,
 
             // causes and causality
-            'number_of_causes' => $this->numberOfCauses,
-            'has_causality'    => $this->hasCausality,
+            'has_multiple_causes' => $this->hasMultipleCauses,
+            'has_causality'       => $this->hasCausality,
 
             // timers
             'exercise_start_unix' => $this->exerciseStartUnix,
@@ -109,8 +109,8 @@ final class ExerciseMeta
             roleId:          (int)($a['role_id'] ?? 1),
             positionCount:   (int)($a['position_count'] ?? 1),
 
-            numberOfCauses:  array_key_exists('number_of_causes', $a) ? (is_null($a['number_of_causes']) ? null : (int)$a['number_of_causes']) : null,
-            hasCausality:    array_key_exists('has_causality', $a) ? (is_null($a['has_causality']) ? null : (bool)$a['has_causality']) : null,
+            hasMultipleCauses: self::readHasMultipleCauses($a),
+            hasCausality:      array_key_exists('has_causality', $a) ? (is_null($a['has_causality']) ? null : (bool)$a['has_causality']) : null,
 
             exerciseStartUnix: array_key_exists('exercise_start_unix', $a) ? (is_null($a['exercise_start_unix']) ? null : (int)$a['exercise_start_unix']) : null,
             deadlineUnix:      array_key_exists('deadline_unix', $a) ? (is_null($a['deadline_unix']) ? null : (int)$a['deadline_unix']) : null,
@@ -128,14 +128,24 @@ final class ExerciseMeta
      */
     public function consistencyWarning(): ?string
     {
-        if ($this->hasCausality === true && ($this->numberOfCauses === null || $this->numberOfCauses <= 1)) {
+        if ($this->hasCausality === true && $this->hasMultipleCauses !== true) {
             return sprintf(
-                'Inconsistent causality meta: theme_id=%s scenario_id=%s has_causality=1 but number_of_causes=%s',
+                'Inconsistent causality meta: theme_id=%s scenario_id=%s has_causality=1 but has_multiple_causes=%s',
                 (string)($this->themeId ?? 'null'),
                 (string)($this->scenarioId ?? 'null'),
-                (string)($this->numberOfCauses ?? 'null')
+                (string)($this->hasMultipleCauses ?? 'null')
             );
         }
+        return null;
+    }
+
+    /** @param array<string,mixed> $a */
+    private static function readHasMultipleCauses(array $a): ?bool
+    {
+        if (array_key_exists('has_multiple_causes', $a)) {
+            return is_null($a['has_multiple_causes']) ? null : (bool)$a['has_multiple_causes'];
+        }
+
         return null;
     }
 }

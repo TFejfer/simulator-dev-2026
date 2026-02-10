@@ -106,4 +106,40 @@ final class FactsRepository
             ':id' => $id,
         ]);
     }
+
+    /**
+     * Checks if all required key_metas are present for the given access/team/outline/exercise.
+     *
+     * @param int $accessId
+     * @param int $teamNo
+     * @param int $outlineId
+     * @param int $exerciseNo
+     * @param array<string> $requiredKeyMetas List of required key_meta values to check for
+     * @return bool True if all required key_metas are present, false otherwise
+     */
+    public function hasAllKeyMetas(int $accessId, int $teamNo, int $outlineId, int $exerciseNo, array $requiredKeyMetas): bool
+    {
+        if ($accessId <= 0 || $teamNo <= 0 || $outlineId <= 0 || $exerciseNo <= 0) return false;
+        $requiredKeyMetas = array_values(array_unique(array_filter(array_map('strval', $requiredKeyMetas), static fn($v) => $v !== '')));
+        if (!$requiredKeyMetas) return false;
+
+        $stmt = $this->db->prepare("
+            SELECT DISTINCT key_meta
+            FROM problem_form_facts
+            WHERE access_id = :access_id
+            AND team_no = :team_no
+            AND outline_id = :outline_id
+            AND exercise_no = :exercise_no
+        ");
+        $stmt->execute([
+            ':access_id' => $accessId,
+            ':team_no' => $teamNo,
+            ':outline_id' => $outlineId,
+            ':exercise_no' => $exerciseNo,
+        ]);
+        $found = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+        // Check that all requiredKeyMetas are present in $found
+        return empty(array_diff($requiredKeyMetas, $found));
+    }
 }

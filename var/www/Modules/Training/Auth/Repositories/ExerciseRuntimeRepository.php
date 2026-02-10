@@ -34,7 +34,8 @@ final class ExerciseRuntimeRepository
 				scenario_id,
 				format_id,
 				step_no,
-				current_state
+				current_state,
+				next_state
 			FROM log_exercise
 			WHERE access_id = :access_id
 			AND team_no   = :team_no
@@ -439,6 +440,85 @@ final class ExerciseRuntimeRepository
 
 		} catch (Throwable) {
 			return [];
+		}
+	}
+
+	/**
+	 * Finds a specific step row for outline (used for idempotent transitions).
+	 *
+	 * @return array<string,mixed>|null
+	 */
+	public function insertNextStepIfNotExists(array $row): ?int
+	{
+		try {
+			$stmt = $this->dbRuntime->prepare("
+				INSERT INTO log_exercise
+					(access_id, team_no, outline_id, skill_id, exercise_no, theme_id, scenario_id, format_id,
+					step_no, current_state, next_state, actor_token, actor_name, include_in_poll)
+				SELECT
+					:access_id, :team_no, :outline_id, :skill_id, :exercise_no, :theme_id, :scenario_id, :format_id,
+					:step_no, :current_state, :next_state, :actor_token, :actor_name, :include_in_poll
+				WHERE NOT EXISTS (
+					SELECT 1
+					FROM log_exercise
+					WHERE access_id = :access_id
+					AND team_no = :team_no
+					AND outline_id = :outline_id
+					AND step_no >= :step_no
+				)
+			");
+
+			$stmt->execute([
+				':access_id' => (int)$row['access_id'],
+				':team_no' => (int)$row['team_no'],
+				':outline_id' => (int)$row['outline_id'],
+				':skill_id' => (int)$row['skill_id'],
+				':exercise_no' => (int)$row['exercise_no'],
+				':theme_id' => (int)$row['theme_id'],
+				':scenario_id' => (int)$row['scenario_id'],
+				':format_id' => (int)$row['format_id'],
+				':step_no' => (int)$row['step_no'],
+				':current_state' => isset($row['current_state']) ? (int)$row['current_state'] : null,
+				':next_state' => isset($row['next_state']) ? (int)$row['next_state'] : null,
+				':actor_token' => isset($row['actor_token']) ? (string)$row['actor_token'] : null,
+				':actor_name' => isset($row['actor_name']) ? (string)$row['actor_name'] : null,
+				':include_in_poll' => isset($row['include_in_poll']) ? (int)$row['include_in_poll'] : 1,
+			]);
+
+			$id = (int)$this->dbRuntime->lastInsertId();
+			return $id > 0 ? $id : null;
+		} catch (Throwable $e) {
+			// Log gerne $e->getMessage() i din egen error logger
+			return null;
+		}
+	}
+
+	/**
+	 * True if any row for this outline indicates solved state (current_state=99 or next_state=99).
+	 */
+	public function hasSolvedState(int $accessId, int $teamNo, int $outlineId): bool
+	{
+		if ($accessId <= 0 || $teamNo <= 0 || $outlineId <= 0) return false;
+
+		try {
+			$stmt = $this->dbRuntime->prepare("
+			SELECT 1
+				FROM log_exercise
+				WHERE access_id = :access_id
+				  AND team_no = :team_no
+				  AND outline_id = :outline_id
+				  AND (current_state = 99 OR next_state = 99)
+				LIMIT 1
+			");
+			$stmt->execute([
+				':access_id' => $accessId,
+				':team_no' => $teamNo,
+				':outline_id' => $outlineId,
+			]);
+
+			return (bool)$stmt->fetchColumn();
+		} catch (Throwable) {
+			return false;
 		}
 	}
 }

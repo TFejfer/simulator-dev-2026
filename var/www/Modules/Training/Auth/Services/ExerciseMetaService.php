@@ -18,11 +18,11 @@ use Modules\Shared\Support\Timer\ProblemTimerCalculator;
  * - Load latest runtime exercise state (log_exercise) into session cache
  * - Patch token-specific role/position from active participants
  * - Enrich with scenario meta from PROBLEM_CONTENT:
- *     - number_of_causes
+ *     - has_multiple_causes
  *     - has_causality
  *
  * Notes:
- * - This service treats has_causality and number_of_causes as independent derivations.
+ * - This service treats has_causality and has_multiple_causes as independent derivations.
  * - It logs inconsistencies but does not fail the request.
  */
 final class ExerciseMetaService
@@ -33,7 +33,7 @@ final class ExerciseMetaService
 		private ExerciseRuntimeRepository $logExerciseRepo,
 		private ActiveParticipantRepository $participantRepo,
 		private ?ProblemScenarioMetaRepository $scenarioMetaRepo = null,
-		private \Modules\Problem\Content\Repositories\ProblemExerciseParametersRepository|\Modules\Shared\Repositories\SharedExerciseParametersRepository|null $exerciseParamsRepo = null
+		private ?\Modules\Shared\Repositories\SharedExerciseParametersRepository $exerciseParamsRepo = null
 	) {}
 
 	/**
@@ -57,21 +57,12 @@ final class ExerciseMetaService
 		$themeId = isset($row['theme_id']) ? (int)$row['theme_id'] : 0;
 		$scenarioId = isset($row['scenario_id']) ? (int)$row['scenario_id'] : 0;
 
-		$scenarioMeta = [];
-		if ($this->scenarioMetaRepo) {
-			// Repo should return an array; keep it defensive anyway.
-			$scenarioMeta = $this->scenarioMetaRepo->getMeta($themeId, $scenarioId) ?? [];
+		$hasMultipleCauses = null;
+		$hasCausality = null;
+		if ($this->scenarioMetaRepo && $themeId > 0 && $scenarioId > 0) {
+			$hasMultipleCauses = $this->scenarioMetaRepo->hasMultipleCauses($themeId, $scenarioId);
+			$hasCausality = $this->scenarioMetaRepo->hasCausality($themeId, $scenarioId);
 		}
-
-		$numberOfCauses = isset($scenarioMeta['number_of_causes'])
-			? (int)$scenarioMeta['number_of_causes']
-			: null;
-
-		// IMPORTANT:
-		// Casting (bool)'0' is TRUE in PHP. Always cast to int first.
-		$hasCausality = isset($scenarioMeta['has_causality'])
-			? ((int)$scenarioMeta['has_causality'] === 1)
-			: null;
 
 		$meta = new ExerciseMeta(
 			accessId:      (int)$row['access_id'],
@@ -93,8 +84,8 @@ final class ExerciseMetaService
 			positionCount: $positionCount,
 
 			// Causes and causality (scenario meta)
-			numberOfCauses: $numberOfCauses,
-			hasCausality:   $hasCausality
+			hasMultipleCauses: $hasMultipleCauses,
+			hasCausality:       $hasCausality
 		);
 
 		// Non-fatal consistency check (log only)
@@ -110,7 +101,7 @@ final class ExerciseMetaService
 		if ($this->exerciseParamsRepo) {
 			if (method_exists($this->exerciseParamsRepo, 'readAll')) {
 				$timerParams = $this->exerciseParamsRepo->readAll();
-			} elseif (method_exists($this->exerciseParamsRepo, 'getValue')) {
+			} elseif (method_exists($this->exerciseParamsRepo, 'readOne')) {
 				$keys = [
 					'problem_introduction_time',
 					'problem_discovery_time',
@@ -120,7 +111,7 @@ final class ExerciseMetaService
 					'problem_swap_time'
 				];
 				foreach ($keys as $k) {
-					$timerParams[$k] = $this->exerciseParamsRepo->getValue($k);
+					$timerParams[$k] = $this->exerciseParamsRepo->readOne($k);
 				}
 			}
 		}
@@ -189,29 +180,23 @@ final class ExerciseMetaService
 			}
 
 			// Patch scenario meta if missing/null (older session cache / partial deploys)
-			if (!array_key_exists('number_of_causes', $cached) || !array_key_exists('has_causality', $cached)
-				|| $cached['number_of_causes'] === null || $cached['has_causality'] === null
+			if (!array_key_exists('has_multiple_causes', $cached) || !array_key_exists('has_causality', $cached)
+				|| $cached['has_multiple_causes'] === null || $cached['has_causality'] === null
 			) {
 				$themeId = (int)($cached['theme_id'] ?? 0);
 				$scenarioId = (int)($cached['scenario_id'] ?? 0);
 
-				$scenarioMeta = [];
-				if ($this->scenarioMetaRepo) {
-					$scenarioMeta = $this->scenarioMetaRepo->getMeta($themeId, $scenarioId) ?? [];
+				if ($this->scenarioMetaRepo && $themeId > 0 && $scenarioId > 0) {
+					$cached['has_multiple_causes'] = $this->scenarioMetaRepo->hasMultipleCauses($themeId, $scenarioId);
+					$cached['has_causality'] = $this->scenarioMetaRepo->hasCausality($themeId, $scenarioId);
 				}
-
-				$cached['number_of_causes'] = isset($scenarioMeta['number_of_causes'])
-					? (int)$scenarioMeta['number_of_causes']
-					: 1;
-
-				$cached['has_causality'] = isset($scenarioMeta['has_causality'])
-					? ((int)$scenarioMeta['has_causality'] === 1)
-					: false;
 			}
 
 			// Ensure problem_discovery_time is present when cached meta is reused.
-			if (!array_key_exists('problem_discovery_time', $cached) && $this->exerciseParamsRepo && method_exists($this->exerciseParamsRepo, 'getValue')) {
-				$discovery = $this->exerciseParamsRepo->getValue('problem_discovery_time');
+			if (!array_key_exists('problem_discovery_time', $cached) && $this->exerciseParamsRepo
+				&& method_exists($this->exerciseParamsRepo, 'readOne')
+			) {
+				$discovery = $this->exerciseParamsRepo->readOne('problem_discovery_time');
 				if ($discovery !== null) {
 					$cached['problem_discovery_time'] = $discovery;
 				}

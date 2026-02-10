@@ -10,6 +10,34 @@ final class SymptomsRepository
     public function __construct(private PDO $db) {}
 
     /**
+     * Step-by-step gating: symptom must be described (clarify_text) and prioritized.
+     */
+    public function hasPrioritizedClarifiedSymptom(int $accessId, int $teamNo, int $outlineId, int $exerciseNo): bool
+    {
+        if ($accessId <= 0 || $teamNo <= 0 || $outlineId <= 0 || $exerciseNo <= 0) return false;
+
+        $stmt = $this->db->prepare("
+            SELECT 1
+            FROM problem_form_symptoms
+            WHERE access_id = :access_id
+              AND team_no = :team_no
+              AND outline_id = :outline_id
+              AND exercise_no = :exercise_no
+              AND is_priority = 1
+              AND clarify_text IS NOT NULL
+              AND TRIM(clarify_text) <> ''
+            LIMIT 1
+        ");
+        $stmt->execute([
+            ':access_id' => $accessId,
+            ':team_no' => $teamNo,
+            ':outline_id' => $outlineId,
+            ':exercise_no' => $exerciseNo,
+        ]);
+        return (bool)$stmt->fetchColumn();
+    }
+
+    /**
      * @return array<int, array<string,mixed>>
      */
     public function read(int $accessId, int $teamNo, int $outlineId, int $exerciseNo): array

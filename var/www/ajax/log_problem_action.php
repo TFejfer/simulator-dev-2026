@@ -7,6 +7,7 @@ use Engine\Database\DatabaseManager;
 use Modules\Shared\Support\Databases;
 use Modules\Shared\Repositories\CiActionsRepository;
 use Modules\Shared\Repositories\SharedExerciseParametersRepository;
+use Modules\Shared\Support\Timer\TimeLeftService;
 use Modules\Problem\Repositories\ProblemCiActionRepository;
 use Modules\Training\Auth\Repositories\ExerciseRuntimeRepository;
 use Modules\Training\Auth\Repositories\ExerciseStepsRepository;
@@ -111,7 +112,8 @@ try {
     $problemActionRepo = new ProblemCiActionRepository($dbProblem);
     $ciActionsRepo = new CiActionsRepository($dbShared);
     $sharedParamsRepo = new SharedExerciseParametersRepository($dbShared);
-    $serverExerciseStatus = $runtimeRepo->findLatestByOutline($accessId, $teamNo, $clientExerciseStatus['outline_id']);
+    $timeLeftService = new TimeLeftService($runtimeRepo, $sharedParamsRepo);
+    $serverExerciseStatus = $runtimeRepo->findLatestRow($accessId, $teamNo);
     
     if (!is_array($serverExerciseStatus)) {
         http_response_code(422);
@@ -276,25 +278,24 @@ try {
     // Guard clause: Check if time is up in discovery format
     $serverFormatId = (int)($serverExerciseStatus['format_id'] ?? 0);
     if ($serverFormatId === 1) {
-        $exerciseStartTimeEpoch = $runtimeRepo->findExerciseStartTime($accessId, $clientExerciseStatus['outline_id'], $teamNo);
-        if (!$exerciseStartTimeEpoch) {
+        $timeLeft = $timeLeftService->getSecondsLeftFromFirstStep(
+            $accessId,
+            $teamNo,
+            $clientExerciseStatus['outline_id'],
+            20,
+            'problem_discovery_time'
+        );
+
+        if (isset($timeLeft['error'])) {
+            $msg = $timeLeft['error'] === 'missing_start'
+                ? 'No exercise start time found'
+                : 'No discovery time found';
             http_response_code(422);
-            echo json_encode(['ok' => false, 'data' => null, 'error' => 'No exercise start time found'], JSON_UNESCAPED_UNICODE);
+            echo json_encode(['ok' => false, 'data' => null, 'error' => $msg], JSON_UNESCAPED_UNICODE);
             exit;
         }
 
-        $sharedParams = $sharedParamsRepo->readAll();
-        $discoveryTimeSeconds = isset($sharedParams['problem_discovery_time'])
-            ? (int)$sharedParams['problem_discovery_time']
-            : null;
-        if (!$discoveryTimeSeconds) {
-            http_response_code(422);
-            echo json_encode(['ok' => false, 'data' => null, 'error' => 'No discovery time found'], JSON_UNESCAPED_UNICODE);
-            exit;
-        }
-        
-        $currentTimeEpoch = time();
-        if (($currentTimeEpoch - $exerciseStartTimeEpoch) > $discoveryTimeSeconds) {
+        if ((int)$timeLeft['seconds_left'] <= 0) {
             http_response_code(409);
             echo json_encode(['ok' => false, 'data' => null, 'error' => 'Discovery time is up'], JSON_UNESCAPED_UNICODE);
             exit;

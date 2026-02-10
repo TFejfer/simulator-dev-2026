@@ -98,4 +98,30 @@ final class SpecificationRepository
 			':actor_token' => $actorToken,
 		]);
 	}
+
+	public function hasAllKeyMetas(int $accessId, int $teamNo, int $outlineId, int $exerciseNo, array $requiredKeyMetas): bool
+	{
+		if ($accessId <= 0 || $teamNo <= 0 || $outlineId <= 0 || $exerciseNo <= 0) return false;
+		$requiredKeyMetas = array_values(array_unique(array_filter(array_map('strval', $requiredKeyMetas), static fn($v) => $v !== '')));
+		if (!$requiredKeyMetas) return false;
+
+		$stmt = $this->db->prepare("
+			SELECT DISTINCT field
+			FROM problem_form_kt_specification
+			WHERE access_id = :access_id
+			AND team_no = :team_no
+			AND outline_id = :outline_id
+			AND exercise_no = :exercise_no
+		");
+		$stmt->execute([
+			':access_id' => $accessId,
+			':team_no' => $teamNo,
+			':outline_id' => $outlineId,
+			':exercise_no' => $exerciseNo,
+		]);
+		$found = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+
+		// Check that all requiredKeyMetas are present in $found
+		return empty(array_diff($requiredKeyMetas, $found));
+	}
 }

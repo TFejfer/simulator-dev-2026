@@ -207,11 +207,8 @@ if (isset($dbProblemContent) && $dbProblemContent instanceof \PDO
     );
 }
 
-// Prefer PROBLEM_CONTENT params for problem_* keys; fall back to SHARED_CONTENT.
-if (isset($dbProblemContent) && $dbProblemContent instanceof \PDO
-    && class_exists(\Modules\Problem\Content\Repositories\ProblemExerciseParametersRepository::class)) {
-    $exerciseParamsRepo = new \Modules\Problem\Content\Repositories\ProblemExerciseParametersRepository($dbProblemContent);
-} elseif (class_exists(\Modules\Shared\Repositories\SharedExerciseParametersRepository::class)) {
+// Use SHARED_CONTENT params for problem_* keys.
+if (class_exists(\Modules\Shared\Repositories\SharedExerciseParametersRepository::class)) {
     $exerciseParamsRepo = new \Modules\Shared\Repositories\SharedExerciseParametersRepository($dbSharedContent);
 }
 

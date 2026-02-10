@@ -26,6 +26,11 @@ $deliveryMeta = $_SESSION['delivery_meta'] ?? null;
 $sessionToken = (string)($_SESSION['session_token'] ?? '');
 
 if (empty($uid) || !is_array($deliveryMeta) || $sessionToken === '') {
+	error_log('[training-problem-instructor-analysis] redirect:/login missing session data ' . json_encode([
+		'uid' => $uid,
+		'has_delivery_meta' => is_array($deliveryMeta),
+		'session_token' => $sessionToken !== '' ? 'present' : 'missing'
+	], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 	header('Location: /login');
 	exit;
 }
@@ -37,6 +42,10 @@ $accessId = (int)($deliveryMeta['access_id'] ?? 0);
 $teamNo   = (int)($deliveryMeta['team_no'] ?? 0);
 
 if ($accessId <= 0 || $teamNo <= 0) {
+	error_log('[training-problem-instructor-analysis] redirect:/training-instructor-outline invalid scope ' . json_encode([
+		'access_id' => $accessId,
+		'team_no' => $teamNo
+	], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 	header('Location: /training-instructor-outline');
 	exit;
 }
@@ -44,7 +53,12 @@ if ($accessId <= 0 || $teamNo <= 0) {
 try {
 	$exerciseMeta = $exerciseMetaService->loadIntoSession($accessId, $teamNo, $sessionToken);
 	$exerciseMetaArr = $exerciseMeta->toArray();
-} catch (Throwable) {
+} catch (Throwable $e) {
+	error_log('[training-problem-instructor-analysis] redirect:/training-instructor-outline loadIntoSession failed ' . json_encode([
+		'access_id' => $accessId,
+		'team_no' => $teamNo,
+		'error' => $e->getMessage()
+	], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 	header('Location: /training-instructor-outline');
 	exit;
 }
@@ -61,7 +75,7 @@ $timerParams = [];
 if (isset($exerciseParamsRepo)) {
 	if (method_exists($exerciseParamsRepo, 'readAll')) {
 		$timerParams = $exerciseParamsRepo->readAll();
-	} elseif (method_exists($exerciseParamsRepo, 'getValue')) {
+	} elseif (method_exists($exerciseParamsRepo, 'readOne')) {
 		$keys = [
 			'problem_introduction_time',
 			'problem_discovery_time',
@@ -71,7 +85,7 @@ if (isset($exerciseParamsRepo)) {
 			'problem_swap_time'
 		];
 		foreach ($keys as $k) {
-			$timerParams[$k] = $exerciseParamsRepo->getValue($k);
+			$timerParams[$k] = $exerciseParamsRepo->readOne($k);
 		}
 	}
 }
