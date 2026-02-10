@@ -521,4 +521,52 @@ final class ExerciseRuntimeRepository
 			return false;
 		}
 	}
+
+	/**
+	 * Latest action row (ci_id not null) for this access/team.
+	 *
+	 * @return array<string,mixed>|null
+	 */
+	public function findLatestActionRow(int $accessId, int $teamNo): ?array
+	{
+		if ($accessId <= 0 || $teamNo <= 0) return null;
+
+		try {
+			$stmt = $this->dbRuntime->prepare("
+				SELECT
+					id,
+					created_at,
+					outline_id,
+					exercise_no,
+					theme_id,
+					scenario_id,
+					format_id,
+					step_no,
+					current_state,
+					next_state,
+					ci_id,
+					action_id,
+					outcome_id,
+					action_type_id,
+					time_min,
+					cost,
+					risk
+				FROM log_exercise
+				WHERE access_id = :access_id
+				  AND team_no = :team_no
+				  AND ci_id IS NOT NULL
+				ORDER BY id DESC
+				LIMIT 1
+			");
+			$stmt->execute([
+				':access_id' => $accessId,
+				':team_no' => $teamNo,
+			]);
+
+			$row = $stmt->fetch(PDO::FETCH_ASSOC);
+			return $row ?: null;
+		} catch (Throwable) {
+			return null;
+		}
+	}
 }

@@ -162,6 +162,17 @@ if (!empty($customScriptArr['risk-instr-dashboard'])) {
     echo $css('/common/assets/css/risk-instr-dashboard.css');
 }
 
+// -------------------------------------------------
+// Page-specific CSS assets (optional)
+// -------------------------------------------------
+$assetsCss = $view['assets']['css'] ?? [];
+if (is_array($assetsCss)) {
+    foreach ($assetsCss as $href) {
+        if (!is_string($href) || $href === '') continue;
+        echo $css($href);
+    }
+}
+
 // ------------------------------------------------------------------
 // Default UI libs (most pages)
 // ------------------------------------------------------------------

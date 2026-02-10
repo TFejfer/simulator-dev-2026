@@ -20,6 +20,7 @@
 		'training-instructor-setup': { term_id: 539 },
 		'training-instructor-outline': { term_id: 306 },
 		'training-instructor-problem-analysis': { term_id: 561 },
+		'training-instructor-problem-action': { term_id: 36 },
 		'training-instructor-results': { term_id: 562 },
 		'training-instructor-result': { term_id: 107 },
 	});
