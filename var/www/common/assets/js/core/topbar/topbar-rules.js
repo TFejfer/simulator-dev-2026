@@ -76,7 +76,7 @@
 		const hasCountdownInputs = Number(ctx.deadline_unix || 0) > 0 || Number(ctx.seconds_left || 0) > 0;
 
 		if ([1, 10, 11].includes(f) && hasCountdownInputs) {
-			out.areas.a4 = 'timerCountDown';
+			out.areas.a4 = 'timerCountDownHidden';
 			out.timer = { mode: 'countdown' };
 		} else {
 			out.areas.a4 = 'timerCountUp';

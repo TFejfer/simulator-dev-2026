@@ -95,6 +95,18 @@
 			`;
 		},
 
+		timerCountDownHidden: (ctx) => {
+			if (hasFn('simulatorTopBarCountDownHTML')) return window.simulatorTopBarCountDownHTML(ctx.simulator);
+
+			return `
+				<div style="position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden;">
+					<div id="countDownTimer" class="topbar-content">
+						<span class="minutes"></span>:<span class="seconds"></span>
+					</div>
+				</div>
+			`;
+		},
+
 		timerCountUp: (ctx) => {
 			if (hasFn('simulatorTopBarCountUpHTML')) return window.simulatorTopBarCountUpHTML(ctx.simulator);
 

@@ -145,8 +145,16 @@
 			const startUnix = Number(ctx?.exercise_start_unix || ctx?.timer_start_unix || 0);
 			if (!Number.isFinite(startUnix) || startUnix <= 0) return;
 
+			const endUnix = Number(ctx?.timer_end_unix || 0);
+			const stepNo = Number(ctx?.step_no || ctx?.exercise?.step_no || 0);
+
 			countUpStartUnix = Math.floor(startUnix);
 			activeMode = 'countup';
+
+			if (stepNo >= 100 && Number.isFinite(endUnix) && endUnix > countUpStartUnix) {
+				renderCountUp(Math.max(0, Math.floor(endUnix) - countUpStartUnix));
+				return;
+			}
 
 			hookVisibilityOnce();
 			tick();

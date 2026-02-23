@@ -38,8 +38,23 @@
 		outcome_text: String(ACTION_META.outcome_text || ''),
 		performing_term: String(ACTION_META.performing_term || 'Performing'),
 		image_src: String(ACTION_META.image_src || ''),
-		lottie_src: String(ACTION_META.lottie_src || ''),
+		lottie_id: Number(ACTION_META.lottie_id || 0),
+		lottie_code: String(ACTION_META.lottie_code || ''),
 		is_solved: Boolean(ACTION_META.is_solved || false),
+	};
+
+	const parseLottiePayload = (code) => {
+		const raw = String(code || '').trim();
+		if (!raw) return null;
+		if (raw.startsWith('{') || raw.startsWith('[')) {
+			try {
+				return JSON.parse(raw);
+			} catch (e) {
+				dwarn('lottie json parse failed', e);
+				return null;
+			}
+		}
+		return raw;
 	};
 
 	const exercise = {
@@ -111,13 +126,20 @@
 
 	const activateLottieIfNeeded = () => {
 		if (!action.is_solved) return;
-		if (!action.lottie_src) return;
+		if (!action.lottie_code) return;
 
 		const player = document.getElementById('lottie-player');
 		const img = document.getElementById('problem_action_image');
 		if (!player) return;
 
-		player.setAttribute('src', action.lottie_src);
+		const payload = parseLottiePayload(action.lottie_code);
+		if (!payload) return;
+
+		if (typeof payload === 'string') {
+			player.setAttribute('src', payload);
+		} else if (typeof player.load === 'function') {
+			player.load(payload);
+		}
 		player.setAttribute('background', 'transparent');
 		player.setAttribute('speed', '0.5');
 		player.setAttribute('autoplay', '');

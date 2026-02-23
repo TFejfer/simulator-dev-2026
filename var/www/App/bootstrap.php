@@ -116,6 +116,10 @@ $sharedExerciseParamsRepo = null;
 if (class_exists(\Modules\Shared\Repositories\SharedExerciseParametersRepository::class)) {
     $sharedExerciseParamsRepo = new \Modules\Shared\Repositories\SharedExerciseParametersRepository($dbSharedContent);
 }
+$lottieRepo = null;
+if (class_exists(\Modules\Shared\Repositories\LottieRepository::class)) {
+    $lottieRepo = new \Modules\Shared\Repositories\LottieRepository($dbSharedContent);
+}
 
 $sharedContentBuilder = new \Modules\Shared\Services\SharedContent\Builders\SharedContentPayloadBuilder(
     $sharedTextsRepo,
