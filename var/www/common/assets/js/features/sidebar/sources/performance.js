@@ -102,7 +102,7 @@
 		if (!hasContent) return renderEmpty(title);
 
 		const lang = ctx?.delivery?.language_code || ctx?.delivery?.languageCode || 'en';
-		const step = Number(ctx?.exercise?.step || ctx?.exercise?.current_step || 0);
+		const step = Number(ctx?.exercise?.step_no || ctx?.exercise?.step || ctx?.exercise?.current_step || 0);
 
 		const pesId = source.pes_video_id || '';
 		let peaId = source.pea_video_id_actual || source.pea_video_id || '';

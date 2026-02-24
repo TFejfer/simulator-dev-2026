@@ -28,6 +28,12 @@
 
 	const resolve = (ctx) => {
 		const pageKey = String(ctx?.page_key || '');
+		const stepNo = Number(ctx?.step_no || ctx?.exercise?.step_no || 0);
+
+		// Exceptional special case: problem analysis page shows "Finalize" title in finalize step
+		if (pageKey === 'training-instructor-problem-analysis' && stepNo >= 80) {
+			return termCommon(564, '');
+		}
 
 		const overrideId = Number(window.PAGE_TITLE_TERM_ID || 0);
 		if (overrideId > 0) {

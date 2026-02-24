@@ -170,8 +170,10 @@
 
 	const render = (ctx, source) => {
 		const title = getMenuButtonLabel(window.SIM_SHARED?.menu_buttons || [], 'log', 'System log');
+		const step = Number(ctx?.exercise?.step_no || 0);
 		const slsRows = buildRows('sls', source?.sls || source?.should);
-		const slaRows = buildRows('sla', source?.sla || source?.actual);
+		const rawSlaRows = buildRows('sla', source?.sla || source?.actual);
+		const slaRows = step === 80 && slsRows ? slsRows : rawSlaRows;
 		const hasContent = Boolean(slsRows || slaRows);
 
 		dbg('render', { hasContent, hasSls: Boolean(slsRows), hasSla: Boolean(slaRows) });
