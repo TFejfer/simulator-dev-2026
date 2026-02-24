@@ -29,6 +29,8 @@
 		);
 	};
 
+	const isCompletePage = (ctx) => String(ctx.page_key || '') === 'training-instructor-problem-complete';
+
 	const isExercisePage = (ctx) => !isCoursePage(ctx);
 
 	// Default layout (applied first, then overridden by rules)
@@ -74,9 +76,10 @@
 
 		const f = Number(ctx.format_no || 0);
 		const hasCountdownInputs = Number(ctx.deadline_unix || 0) > 0 || Number(ctx.seconds_left || 0) > 0;
+		const isFinalize = String(ctx.timer_phase || '') === 'finalize' || Number(ctx.step_no || 0) >= 80;
 
-		if ([1, 10, 11].includes(f) && hasCountdownInputs) {
-			out.areas.a4 = 'timerCountDownHidden';
+		if (!isCompletePage(ctx) && hasCountdownInputs && (isFinalize || [1, 10, 11].includes(f))) {
+			out.areas.a4 = 'timerCountDown';
 			out.timer = { mode: 'countdown' };
 		} else {
 			out.areas.a4 = 'timerCountUp';

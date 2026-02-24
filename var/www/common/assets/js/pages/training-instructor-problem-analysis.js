@@ -58,6 +58,8 @@
 	if (!EXERCISE_META) console.error('[analysis] missing EXERCISE_META in page-data');
 	dlog('EXERCISE_META', EXERCISE_META);
 
+	const isFinalizeStep = Number(EXERCISE_META?.step_no || 0) >= 80;
+
 	// Local runtime store payload (keep keys aligned with backend contract)
 	const EXERCISE_DATA = {
 		ui:{
@@ -112,6 +114,69 @@
 
 	window.ProblemExerciseStaticContent = null;
 	window.ProblemExerciseStateContent = null;
+
+	// ------------------------------------------------------------
+	// 1a) Optional proceed button (finalize step)
+	// ------------------------------------------------------------
+	const ensureProceedButton = () => {
+		if (!isFinalizeStep) return;
+		if (document.getElementById('btn_proceed')) return;
+
+		document.body.insertAdjacentHTML('beforeend', `
+			<div id="btn_proceed" class="proceed-button proceed-button-enabled" data-location="">
+				<div class="icon-center">
+					<i class="fa-light fa-arrow-right"></i>
+				</div>
+			</div>
+		`);
+	};
+
+	const proceedState = { inFlight: false };
+
+	const proceedToNextStep = async () => {
+		if (proceedState.inFlight) return;
+		proceedState.inFlight = true;
+
+		const btn = document.getElementById('btn_proceed');
+		if (btn) {
+			btn.classList.remove('proceed-button-enabled');
+			btn.classList.add('proceed-button-disabled');
+		}
+
+		const payload = {
+			outline_id: Number(EXERCISE_META?.outline_id || 0),
+			step_no: Number(EXERCISE_META?.step_no || 0),
+			current_state: Number(EXERCISE_META?.current_state || 0),
+		};
+
+		const res = await simulatorAjaxRequest('/ajax/log_next_step.php', 'POST', payload, { mode: 'dynamic' });
+		if (!res || !res.ok) {
+			proceedState.inFlight = false;
+			if (btn) {
+				btn.classList.remove('proceed-button-disabled');
+				btn.classList.add('proceed-button-enabled');
+			}
+			dwarn('log_next_step failed', res);
+			return;
+		}
+
+		const nextKey = String(res?.data?.page_key || '').trim();
+		if (nextKey) {
+			window.location.href = nextKey;
+			return;
+		}
+
+		window.location.reload();
+	};
+
+	const bindProceedButton = () => {
+		if (!isFinalizeStep) return;
+		if (typeof window.jQuery === 'undefined') return;
+		ensureProceedButton();
+		window.jQuery(document)
+			.off('click.analysisProceed', '#btn_proceed')
+			.on('click.analysisProceed', '#btn_proceed', proceedToNextStep);
+	};
 
 	// ------------------------------------------------------------
 	// 1b) Published exercise content (non-blocking)
@@ -231,6 +296,8 @@
 				return;
 			}
 
+			ensureProceedButton();
+
 			store = window.simulatorFormsStore.createStore(EXERCISE_DATA);
 			window._debugStore = store;
 
@@ -283,6 +350,7 @@
 		},
 
 		bind: () => {
+			bindProceedButton();
 			if (window.HelpSidebar?.bindCloseButton) {
 				window.HelpSidebar.bindCloseButton();
 			}

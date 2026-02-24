@@ -42,6 +42,17 @@
 		const shouldColor = [1, 10, 11].includes(format);
 		let blink = false;
 		let firedTimesUp = false;
+		let firedFinalize = false;
+
+		const isFinalize = () => {
+			const phase = String(ctx?.timer_phase || '');
+			if (phase === 'finalize') return true;
+			return Number(ctx?.step_no || 0) >= 80;
+		};
+
+		const shouldFinalizeRedirect = () => {
+			return isFinalize() && String(ctx?.page_key || '') === 'training-instructor-problem-analysis';
+		};
 
 		const triggerTimesUp = () => {
 			if (firedTimesUp) return;
@@ -60,6 +71,39 @@
 			}
 		};
 
+		const triggerFinalize = () => {
+			if (firedFinalize) return;
+			firedFinalize = true;
+
+			const payload = {
+				outline_id: Number(ctx?.outline_id || ctx?.exercise?.outline_id || 0),
+				step_no: Number(ctx?.step_no || ctx?.exercise?.step_no || 0),
+				current_state: Number(ctx?.current_state || ctx?.exercise?.current_state || 0),
+			};
+
+			try {
+				window.fetch('/ajax/log_next_step.php', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(payload)
+				})
+					.then((res) => res.json().catch(() => ({})))
+					.then((data) => {
+						const nextKey = String(data?.data?.page_key || '').trim();
+						if (nextKey) {
+							window.location.href = nextKey;
+							return;
+						}
+						window.location.reload();
+					})
+					.catch(() => {
+						window.location.reload();
+					});
+			} catch {
+				window.location.reload();
+			}
+		};
+
 		return (tSeconds) => {
 			if (!$) return;
 			const area = $('#topBarArea4');
@@ -70,7 +114,11 @@
 			if (!Number.isFinite(tSeconds)) return;
 
 			if (tSeconds <= 0) {
-				triggerTimesUp();
+				if (shouldFinalizeRedirect()) {
+					triggerFinalize();
+				} else {
+					triggerTimesUp();
+				}
 				return;
 			}
 
@@ -110,6 +158,8 @@
 
 			format_no: Number(exercise?.format_no || exercise?.format || 0),
 			step_no: Number(exercise?.step_no || exercise?.step || 0),
+			outline_id: Number(exercise?.outline_id || 0),
+			current_state: Number(exercise?.current_state || 0),
 
 			server_now_unix: Number.isFinite(server_now_unix) ? server_now_unix : 0,
 
@@ -118,6 +168,7 @@
 			deadline_unix: Number(exercise?.deadline_unix || 0),
 			timer_end_unix: Number(exercise?.timer_end_unix || 0),
 			seconds_left: Number(exercise?.seconds_left || 0),
+			timer_phase: String(exercise?.timer_phase || ''),
 
 			role: pd?.DATA?.ROLE || null
 		};
