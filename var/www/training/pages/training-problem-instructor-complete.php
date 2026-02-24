@@ -55,7 +55,39 @@ try {
 	exit;
 }
 
+$stepNo = (int)($exerciseMetaArr['step_no'] ?? 0);
+$formatId = (int)($exerciseMetaArr['format_id'] ?? 0);
+$skillId = (int)($exerciseMetaArr['skill_id'] ?? 0);
+
+if ($stepNo !== 100) {
+	header('Location: /training-instructor-outline');
+	exit;
+}
+
+if (!isset($exerciseStepsRepo) || !$exerciseStepsRepo instanceof \Modules\Training\Auth\Repositories\ExerciseStepsRepository) {
+	throw new RuntimeException('ExerciseStepsRepository missing in bootstrap.');
+}
+
+$stepRow = $exerciseStepsRepo->findStepRow($skillId, $formatId, 100);
+if (!is_array($stepRow) || (int)($stepRow['step_no'] ?? 0) !== 100) {
+	header('Location: /training-instructor-outline');
+	exit;
+}
+
 $serverNow = time();
+
+if (isset($problemMetricsService) && $problemMetricsService instanceof \Modules\Problem\Services\Metrics\ProblemMetricsService) {
+	try {
+		$languageCode = (string)($deliveryMeta['language_code'] ?? 'en');
+		$problemMetricsService->computeAndPersist($accessId, $teamNo, $languageCode);
+	} catch (Throwable $e) {
+		error_log('[training-problem-instructor-complete] metrics failed ' . json_encode([
+			'access_id' => $accessId,
+			'team_no' => $teamNo,
+			'error' => $e->getMessage(),
+		], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+	}
+}
 
 // Timer fields are precomputed and cached in session (ExerciseMetaService)
 $exerciseStartUnix = (int)($exerciseMetaArr['exercise_start_unix'] ?? 0);

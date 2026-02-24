@@ -193,6 +193,10 @@ $trainingAccessRepo  = new \Modules\Training\Auth\Repositories\AccessRepository(
 $trainingAttemptRepo = new \Modules\Training\Auth\Repositories\LoginAttemptRepository($dbRuntime);
 $trainingActiveRepo  = new \Modules\Training\Auth\Repositories\ActiveParticipantRepository($dbRuntime);
 
+// ---------- 9.5) Training: exercise steps (shared_content) ----------
+
+$exerciseStepsRepo = new \Modules\Training\Auth\Repositories\ExerciseStepsRepository($dbSharedContent);
+
 // ---------- 10) Training: Exercise meta (runtime cache + DB truth) ----------
 
 $exerciseRuntimeRepo = new \Modules\Training\Auth\Repositories\ExerciseRuntimeRepository($dbRuntime);
@@ -221,6 +225,34 @@ $exerciseMetaService = new \Modules\Training\Auth\Services\ExerciseMetaService(
 	$trainingActiveRepo,
     $scenarioMetaRepo,
     $exerciseParamsRepo
+);
+
+// ---------- 10.5) Problem: metrics (runtime + content) ----------
+
+$problemMetricsRepo = new \Modules\Problem\Repositories\Metrics\ProblemMetricsRepository($dbRuntime);
+$problemSuccessCriteriaRepo = new \Modules\Problem\Repositories\Metrics\ProblemSuccessCriteriaRepository($dbRuntime);
+$problemExerciseLogRepo = new \Modules\Problem\Repositories\Metrics\ProblemExerciseLogRepository($dbRuntime);
+$problemWorkflowLogRepo = new \Modules\Problem\Repositories\Metrics\WorkflowLogReadRepository($dbRuntime);
+
+$refActionsNotToTakeRepo = new \Modules\Problem\Content\Repositories\ReferenceActionsNotToTakeRepository($dbProblemContent);
+$refSymptomsRepo = new \Modules\Problem\Content\Repositories\ReferenceSymptomsRepository($dbProblemContent);
+$refFactsRepo = new \Modules\Problem\Content\Repositories\ReferenceFactsRepository($dbProblemContent);
+$refCausesRepo = new \Modules\Problem\Content\Repositories\ReferenceCausesRepository($dbProblemContent);
+
+$problemMetricsService = new \Modules\Problem\Services\Metrics\ProblemMetricsService(
+    $exerciseRuntimeRepo,
+    $problemExerciseLogRepo,
+    $problemWorkflowLogRepo,
+    new \Modules\Problem\Repositories\Forms\SymptomsRepository($dbRuntime),
+    new \Modules\Problem\Repositories\Forms\FactsRepository($dbRuntime),
+    new \Modules\Problem\Repositories\Forms\CausesRepository($dbRuntime),
+    new \Modules\Problem\Repositories\Forms\ActionsRepository($dbRuntime),
+    $refActionsNotToTakeRepo,
+    $refSymptomsRepo,
+    $refFactsRepo,
+    $refCausesRepo,
+    $problemMetricsRepo,
+    $problemSuccessCriteriaRepo
 );
 
 // League repo is a stub until league tables are wired
