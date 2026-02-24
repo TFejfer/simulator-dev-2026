@@ -1618,6 +1618,14 @@
 
 					$btn.removeClass('clickable').addClass('act-action-clicked');
 					log('action clicked', { ciId, actionId });
+
+					const pageKey = String(ctx?.pageKey || document.body?.dataset?.ctx || '');
+					const path = window.location && window.location.pathname ? window.location.pathname : '';
+					const isAnalysisPage = pageKey === 'training-instructor-problem-analysis'
+						|| path.indexOf('training-problem-instructor-analysis') !== -1;
+					if (isAnalysisPage) {
+						window.location.assign('/training-problem-instructor-action');
+					}
 				});
 		}
 
