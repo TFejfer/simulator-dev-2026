@@ -31,23 +31,33 @@ final class ProblemExerciseLogRepository
             return [];
         }
 
-        $teamPlaceholders = [];
+        $teamPlaceholdersStart = [];
+        $teamPlaceholdersMain = [];
         $params = [
-            ':access_id' => $accessId,
-            ':outline_id' => $outlineId,
-            ':exercise_no' => $exerciseNo,
-            ':theme_id' => $themeId,
-            ':scenario_id' => $scenarioId,
+            ':access_id_start' => $accessId,
+            ':outline_id_start' => $outlineId,
+            ':exercise_no_start' => $exerciseNo,
+            ':theme_id_start' => $themeId,
+            ':scenario_id_start' => $scenarioId,
+            ':access_id_main' => $accessId,
+            ':outline_id_main' => $outlineId,
+            ':exercise_no_main' => $exerciseNo,
+            ':theme_id_main' => $themeId,
+            ':scenario_id_main' => $scenarioId,
         ];
         foreach ($teamNos as $i => $teamNo) {
-            $ph = ':team' . $i;
-            $teamPlaceholders[] = $ph;
-            $params[$ph] = $teamNo;
+            $phStart = ':team_start_' . $i;
+            $phMain = ':team_main_' . $i;
+            $teamPlaceholdersStart[] = $phStart;
+            $teamPlaceholdersMain[] = $phMain;
+            $params[$phStart] = $teamNo;
+            $params[$phMain] = $teamNo;
         }
 
-        $inClause = implode(', ', $teamPlaceholders);
+        $inClauseStart = implode(', ', $teamPlaceholdersStart);
+        $inClauseMain = implode(', ', $teamPlaceholdersMain);
 
-        $stmt = $this->dbRuntime->prepare("
+        $sql = "
             SELECT
                 t1.id,
                 t1.created_at AS ts,
@@ -76,24 +86,34 @@ final class ProblemExerciseLogRepository
             FROM log_exercise t1
             LEFT JOIN (
                 SELECT MIN(created_at) AS start_ts
-                FROM log_exercise
-                WHERE access_id = :access_id
-                  AND team_no IN ($inClause)
-                  AND outline_id = :outline_id
-                  AND exercise_no = :exercise_no
-                  AND theme_id = :theme_id
-                  AND scenario_id = :scenario_id
+                                FROM log_exercise
+                                WHERE access_id = :access_id_start
+                                    AND team_no IN ($inClauseStart)
+                                    AND outline_id = :outline_id_start
+                                    AND exercise_no = :exercise_no_start
+                                    AND theme_id = :theme_id_start
+                                    AND scenario_id = :scenario_id_start
             ) tstart ON 1=1
-            WHERE t1.access_id = :access_id
-              AND t1.team_no IN ($inClause)
-              AND t1.outline_id = :outline_id
-              AND t1.exercise_no = :exercise_no
-              AND t1.theme_id = :theme_id
-              AND t1.scenario_id = :scenario_id
+                        WHERE t1.access_id = :access_id_main
+                            AND t1.team_no IN ($inClauseMain)
+                            AND t1.outline_id = :outline_id_main
+                            AND t1.exercise_no = :exercise_no_main
+                            AND t1.theme_id = :theme_id_main
+                            AND t1.scenario_id = :scenario_id_main
             ORDER BY t1.id ASC
-        ");
+                        ";
 
-        $stmt->execute($params);
+                        $stmt = $this->dbRuntime->prepare($sql);
+                        try {
+                            $stmt->execute($params);
+                        } catch (\Throwable $e) {
+                            error_log('[ProblemExerciseLogRepository] execute failed ' . json_encode([
+                                'message' => $e->getMessage(),
+                                'params' => array_keys($params),
+                                'sql' => $sql,
+                            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+                            throw $e;
+                        }
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         return is_array($rows) ? $rows : [];
     }

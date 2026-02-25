@@ -35,13 +35,23 @@ final class WorkflowLogReadRepository
 
         $teamPlaceholders = [];
         $params = [
-            ':access_id' => $accessId,
-            ':outline_id' => $outlineId,
-            ':exercise_no' => $exerciseNo,
-            ':theme_id' => $themeId,
-            ':scenario_id' => $scenarioId,
-            ':team_no' => $teamNo,
-            ':col_team_no' => $colTeamNo,
+            ':access_id_start' => $accessId,
+            ':outline_id_start' => $outlineId,
+            ':exercise_no_start' => $exerciseNo,
+            ':theme_id_start' => $themeId,
+            ':scenario_id_start' => $scenarioId,
+            ':col_team_no_start' => $colTeamNo,
+            ':access_id_end' => $accessId,
+            ':outline_id_end' => $outlineId,
+            ':exercise_no_end' => $exerciseNo,
+            ':theme_id_end' => $themeId,
+            ':scenario_id_end' => $scenarioId,
+            ':team_no_end' => $teamNo,
+            ':access_id_main' => $accessId,
+            ':outline_id_main' => $outlineId,
+            ':exercise_no_main' => $exerciseNo,
+            ':theme_id_main' => $themeId,
+            ':scenario_id_main' => $scenarioId,
         ];
         foreach ($teamNos as $i => $t) {
             $ph = ':team' . $i;
@@ -51,7 +61,7 @@ final class WorkflowLogReadRepository
 
         $inClause = implode(', ', $teamPlaceholders);
 
-        $stmt = $this->dbRuntime->prepare("
+        $sql = "
             SELECT
                 t1.id,
                 UNIX_TIMESTAMP(t1.created_at) AS epochTs,
@@ -69,35 +79,45 @@ final class WorkflowLogReadRepository
             FROM log_team_workflow t1
             LEFT JOIN (
                 SELECT MIN(created_at) AS start_ts
-                FROM log_exercise
-                WHERE access_id = :access_id
-                  AND team_no = :col_team_no
-                  AND outline_id = :outline_id
-                  AND exercise_no = :exercise_no
-                  AND theme_id = :theme_id
-                  AND scenario_id = :scenario_id
+                                FROM log_exercise
+                                WHERE access_id = :access_id_start
+                                    AND team_no = :col_team_no_start
+                                    AND outline_id = :outline_id_start
+                                    AND exercise_no = :exercise_no_start
+                                    AND theme_id = :theme_id_start
+                                    AND scenario_id = :scenario_id_start
             ) tstart ON 1=1
             LEFT JOIN (
                 SELECT MAX(created_at) AS end_ts
                 FROM log_exercise
-                WHERE access_id = :access_id
-                  AND team_no = :team_no
-                  AND outline_id = :outline_id
-                  AND exercise_no = :exercise_no
-                  AND theme_id = :theme_id
-                  AND scenario_id = :scenario_id
+                                WHERE access_id = :access_id_end
+                                    AND team_no = :team_no_end
+                                    AND outline_id = :outline_id_end
+                                    AND exercise_no = :exercise_no_end
+                                    AND theme_id = :theme_id_end
+                                    AND scenario_id = :scenario_id_end
             ) tend ON 1=1
-            WHERE t1.access_id = :access_id
+                        WHERE t1.access_id = :access_id_main
               AND t1.team_no IN ($inClause)
-              AND t1.outline_id = :outline_id
-              AND t1.exercise_no = :exercise_no
-              AND t1.theme_id = :theme_id
-              AND t1.scenario_id = :scenario_id
+                            AND t1.outline_id = :outline_id_main
+                            AND t1.exercise_no = :exercise_no_main
+                            AND t1.theme_id = :theme_id_main
+                            AND t1.scenario_id = :scenario_id_main
               AND (tend.end_ts IS NULL OR t1.created_at < tend.end_ts)
             ORDER BY tix ASC
-        ");
+                        ";
 
-        $stmt->execute($params);
+                        $stmt = $this->dbRuntime->prepare($sql);
+                        try {
+                            $stmt->execute($params);
+                        } catch (\Throwable $e) {
+                            error_log('[WorkflowLogReadRepository] execute failed ' . json_encode([
+                                'message' => $e->getMessage(),
+                                'params' => array_keys($params),
+                                'sql' => $sql,
+                            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+                            throw $e;
+                        }
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         return is_array($rows) ? $rows : [];
     }

@@ -25,7 +25,8 @@
 			k === 'training-instructor-setup' ||
 			k === 'training-instructor-outline' ||
 			k === 'training-instructor-results' ||
-			k === 'training-instructor-result'
+			k === 'training-instructor-result' ||
+			k === 'training-instructor-problem-result'
 		);
 	};
 

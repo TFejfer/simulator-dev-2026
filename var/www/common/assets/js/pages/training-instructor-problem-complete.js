@@ -111,7 +111,7 @@
 
 	const resolveResultTarget = () => {
 		if (exercise.exercise_no > 0 && exercise.skill_id > 0) {
-			return 'training-instructor-result';
+			return 'training-problem-instructor-result';
 		}
 
 		return 'training-instructor-outline';

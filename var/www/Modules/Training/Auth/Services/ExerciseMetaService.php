@@ -46,6 +46,102 @@ final class ExerciseMetaService
 			throw new RuntimeException("log_exercise not found for access_id={$accessId}, team_no={$teamNo}.");
 		}
 
+		return $this->buildAndCacheFromRow($row, $accessId, $teamNo, $token);
+	}
+
+	/**
+	 * Loads a specific exercise into session (latest row for exercise_no).
+	 */
+	public function loadByExerciseNoIntoSession(int $accessId, int $teamNo, int $exerciseNo, string $token): ExerciseMeta
+	{
+		$row = $this->logExerciseRepo->findLatestByExerciseNo($accessId, $teamNo, $exerciseNo);
+		if (!$row) {
+			throw new RuntimeException("log_exercise not found for access_id={$accessId}, team_no={$teamNo}, exercise_no={$exerciseNo}.");
+		}
+
+		return $this->buildAndCacheFromRow($row, $accessId, $teamNo, $token);
+	}
+
+	public function getCached(): ?array
+	{
+		$cached = $_SESSION[self::SESSION_KEY] ?? null;
+		return is_array($cached) ? $cached : null;
+	}
+
+	/**
+	 * If client supplies last known log_exercise_id, refresh only when stale.
+	 * Ideal for Ajax.
+	 */
+	public function ensureFresh(int $accessId, int $teamNo, string $token, ?int $clientLogExerciseId): ExerciseMeta
+	{
+		$cached = $this->getCached();
+
+		// If cache matches scope and version, reuse and patch token-specific fields (cheap).
+		if (is_array($cached)
+			&& (int)($cached['access_id'] ?? 0) === $accessId
+			&& (int)($cached['team_no'] ?? 0) === $teamNo
+			&& $clientLogExerciseId !== null
+			&& (int)($cached['log_exercise_id'] ?? 0) === $clientLogExerciseId
+		) {
+			// Patch role/position each time (token-specific; can change independently)
+			$rp = $this->participantRepo->findRoleAndPosition($accessId, $token);
+			if (is_array($rp) && $rp) {
+				$cached['role_id'] = (int)($rp['role_id'] ?? $cached['role_id'] ?? 1);
+				$cached['position_count'] = (int)($rp['position_count'] ?? $cached['position_count'] ?? 1);
+			}
+
+			// Patch scenario meta if missing/null (older session cache / partial deploys)
+			if (!array_key_exists('has_multiple_causes', $cached) || !array_key_exists('has_causality', $cached)
+				|| $cached['has_multiple_causes'] === null || $cached['has_causality'] === null
+			) {
+				$themeId = (int)($cached['theme_id'] ?? 0);
+				$scenarioId = (int)($cached['scenario_id'] ?? 0);
+
+				if ($this->scenarioMetaRepo && $themeId > 0 && $scenarioId > 0) {
+					$cached['has_multiple_causes'] = $this->scenarioMetaRepo->hasMultipleCauses($themeId, $scenarioId);
+					$cached['has_causality'] = $this->scenarioMetaRepo->hasCausality($themeId, $scenarioId);
+				}
+			}
+
+			// Ensure problem_discovery_time is present when cached meta is reused.
+			if (!array_key_exists('problem_discovery_time', $cached) && $this->exerciseParamsRepo
+				&& method_exists($this->exerciseParamsRepo, 'readOne')
+			) {
+				$discovery = $this->exerciseParamsRepo->readOne('problem_discovery_time');
+				if ($discovery !== null) {
+					$cached['problem_discovery_time'] = $discovery;
+				}
+			}
+
+			$_SESSION[self::SESSION_KEY] = $cached;
+
+			$meta = $this->fromArray($_SESSION[self::SESSION_KEY]);
+
+			// Non-fatal consistency check (log only)
+			$warning = $meta->consistencyWarning();
+			if ($warning !== null) {
+				error_log('[exercise-meta] ' . $warning);
+			}
+
+			return $meta;
+		}
+
+		// Otherwise reload from DB and overwrite session cache
+		return $this->loadIntoSession($accessId, $teamNo, $token);
+	}
+
+	private function fromArray(array $a): ExerciseMeta
+	{
+		return ExerciseMeta::fromArray($a);
+	}
+
+	/**
+	 * Build ExerciseMeta from a concrete log_exercise row and cache into session.
+	 *
+	 * @param array<string,mixed> $row
+	 */
+	private function buildAndCacheFromRow(array $row, int $accessId, int $teamNo, string $token): ExerciseMeta
+	{
 		// Token-specific runtime meta (can change without log_exercise changing)
 		$rp = $this->participantRepo->findRoleAndPosition($accessId, $token);
 
@@ -147,80 +243,5 @@ final class ExerciseMetaService
 		$_SESSION[self::SESSION_KEY] = $metaArr;
 
 		return $this->fromArray($metaArr);
-
-		return $meta;
-	}
-
-	public function getCached(): ?array
-	{
-		$cached = $_SESSION[self::SESSION_KEY] ?? null;
-		return is_array($cached) ? $cached : null;
-	}
-
-	/**
-	 * If client supplies last known log_exercise_id, refresh only when stale.
-	 * Ideal for Ajax.
-	 */
-	public function ensureFresh(int $accessId, int $teamNo, string $token, ?int $clientLogExerciseId): ExerciseMeta
-	{
-		$cached = $this->getCached();
-
-		// If cache matches scope and version, reuse and patch token-specific fields (cheap).
-		if (is_array($cached)
-			&& (int)($cached['access_id'] ?? 0) === $accessId
-			&& (int)($cached['team_no'] ?? 0) === $teamNo
-			&& $clientLogExerciseId !== null
-			&& (int)($cached['log_exercise_id'] ?? 0) === $clientLogExerciseId
-		) {
-			// Patch role/position each time (token-specific; can change independently)
-			$rp = $this->participantRepo->findRoleAndPosition($accessId, $token);
-			if (is_array($rp) && $rp) {
-				$cached['role_id'] = (int)($rp['role_id'] ?? $cached['role_id'] ?? 1);
-				$cached['position_count'] = (int)($rp['position_count'] ?? $cached['position_count'] ?? 1);
-			}
-
-			// Patch scenario meta if missing/null (older session cache / partial deploys)
-			if (!array_key_exists('has_multiple_causes', $cached) || !array_key_exists('has_causality', $cached)
-				|| $cached['has_multiple_causes'] === null || $cached['has_causality'] === null
-			) {
-				$themeId = (int)($cached['theme_id'] ?? 0);
-				$scenarioId = (int)($cached['scenario_id'] ?? 0);
-
-				if ($this->scenarioMetaRepo && $themeId > 0 && $scenarioId > 0) {
-					$cached['has_multiple_causes'] = $this->scenarioMetaRepo->hasMultipleCauses($themeId, $scenarioId);
-					$cached['has_causality'] = $this->scenarioMetaRepo->hasCausality($themeId, $scenarioId);
-				}
-			}
-
-			// Ensure problem_discovery_time is present when cached meta is reused.
-			if (!array_key_exists('problem_discovery_time', $cached) && $this->exerciseParamsRepo
-				&& method_exists($this->exerciseParamsRepo, 'readOne')
-			) {
-				$discovery = $this->exerciseParamsRepo->readOne('problem_discovery_time');
-				if ($discovery !== null) {
-					$cached['problem_discovery_time'] = $discovery;
-				}
-			}
-
-			$_SESSION[self::SESSION_KEY] = $cached;
-
-			$meta = $this->fromArray($_SESSION[self::SESSION_KEY]);
-
-			// Non-fatal consistency check (log only)
-			$warning = $meta->consistencyWarning();
-			if ($warning !== null) {
-				error_log('[exercise-meta] ' . $warning);
-			}
-
-			return $meta;
-		}
-
-		// Otherwise reload from DB and overwrite session cache
-		return $this->loadIntoSession($accessId, $teamNo, $token);
-	}
-
-	private function fromArray(array $a): ExerciseMeta
-	{
-		return ExerciseMeta::fromArray($a);
 	}
 }

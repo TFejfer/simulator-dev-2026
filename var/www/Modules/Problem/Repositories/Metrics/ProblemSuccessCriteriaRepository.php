@@ -60,4 +60,48 @@ final class ProblemSuccessCriteriaRepository
             ':capture' => (int)($scores['capture'] ?? 0),
         ]);
     }
+
+    /**
+     * Read persisted success criteria for a completed exercise (by outline).
+     *
+     * @return array{proficiency:int, solved:int, risk:int, time_score:int, cost:int, capture:int}
+     */
+    public function readByOutline(int $accessId, int $teamNo, int $outlineId): array
+    {
+        if ($accessId <= 0 || $teamNo <= 0 || $outlineId <= 0) {
+            return [
+                'proficiency' => 0,
+                'solved' => 0,
+                'risk' => 0,
+                'time_score' => 0,
+                'cost' => 0,
+                'capture' => 0,
+            ];
+        }
+
+        $stmt = $this->dbRuntime->prepare("
+            SELECT proficiency, solved, risk, time_score, cost, capture
+            FROM problem_success_criteria
+            WHERE access_id = :access_id
+              AND team_no = :team_no
+              AND outline_id = :outline_id
+            LIMIT 1
+        ");
+        $stmt->execute([
+            ':access_id' => $accessId,
+            ':team_no' => $teamNo,
+            ':outline_id' => $outlineId,
+        ]);
+
+        $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        return [
+            'proficiency' => (int)($row['proficiency'] ?? 0),
+            'solved' => (int)($row['solved'] ?? 0),
+            'risk' => (int)($row['risk'] ?? 0),
+            'time_score' => (int)($row['time_score'] ?? 0),
+            'cost' => (int)($row['cost'] ?? 0),
+            'capture' => (int)($row['capture'] ?? 0),
+        ];
+    }
 }

@@ -73,6 +73,10 @@
 							return ctx.term(112, 'Results');
 						}
 
+						if (Number(row.skill || 0) !== 1) {
+							return ctx.term(112, 'Results');
+						}
+
 						return `
 							<span
 								class="goto-result link-text"
@@ -125,6 +129,7 @@
 	const navigateToResult = (row) => {
 		const ex = Number(row.exercise || 0);
 		if (!ex) return;
+		if (Number(row.skill || 0) !== 1) return;
 
 		const params = new URLSearchParams({
 			exercise: String(ex),
@@ -134,7 +139,7 @@
 			scenario: String(Number(row.scenario || 0)),
 		});
 
-		window.location.href = `training-instructor-result?${params.toString()}`;
+		window.location.href = `training-problem-instructor-result?${params.toString()}`;
 	};
 
 	SimulatorPage.run({

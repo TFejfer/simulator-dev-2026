@@ -96,6 +96,69 @@ final class ProblemMetricsService
         }
     }
 
+    /**
+     * Build full result payload for a specific exercise.
+     *
+     * Reads metrics + success criteria from persisted tables (no recomputation).
+     *
+     * @return array{
+     *   exercise:array,
+     *   metrics:array<int, array{id:int, value:int, data:mixed, note:string}>,
+     *   success_criteria:array{proficiency:int, solved:int, risk:int, time_score:int, cost:int, capture:int},
+     *   critical_success_factors:array<int, array<string,mixed>>
+     * }
+     */
+    public function buildResultPayloadForExercise(
+        int $accessId,
+        int $teamNo,
+        int $outlineId,
+        int $exerciseNo,
+        int $themeId,
+        int $scenarioId,
+        int $formatId,
+        int $skillId,
+        string $languageCode
+    ): array {
+        if ($accessId <= 0 || $teamNo <= 0 || $outlineId <= 0 || $exerciseNo <= 0) {
+            return [
+                'exercise' => [],
+                'metrics' => [],
+                'success_criteria' => [
+                    'proficiency' => 0,
+                    'solved' => 0,
+                    'risk' => 0,
+                    'time_score' => 0,
+                    'cost' => 0,
+                    'capture' => 0,
+                ],
+                'critical_success_factors' => [],
+            ];
+        }
+
+        $exercise = $this->buildExerciseArray(
+            $accessId,
+            $teamNo,
+            $outlineId,
+            $exerciseNo,
+            $themeId,
+            $scenarioId,
+            $formatId,
+            $skillId,
+            $languageCode
+        );
+
+        $metrics = $this->metricsRepo->readByOutline($accessId, $teamNo, $outlineId);
+        $sc = $this->successRepo->readByOutline($accessId, $teamNo, $outlineId);
+        $csf = $metrics ? $this->buildCriticalSuccessFactors($metrics) : [];
+
+        return [
+            'exercise' => $exercise,
+            'metrics' => $metrics,
+            'success_criteria' => $sc,
+            'critical_success_factors' => $csf,
+        ];
+    }
+
     private function buildExerciseArray(
         int $accessId,
         int $teamNo,
@@ -110,27 +173,54 @@ final class ProblemMetricsService
         $teamValues = $this->problemTeamsArray($teamNo, $formatId);
         $colTeam = $this->isCollabFormat($formatId) ? $this->problemSwapCollaboratingTeam($teamNo) : $teamNo;
 
-        $log = $this->exerciseLogRepo->findTeamExerciseLog(
-            $accessId,
-            $teamValues,
-            $outlineId,
-            $exerciseNo,
-            $themeId,
-            $scenarioId
-        );
+        try {
+            $log = $this->exerciseLogRepo->findTeamExerciseLog(
+                $accessId,
+                $teamValues,
+                $outlineId,
+                $exerciseNo,
+                $themeId,
+                $scenarioId
+            );
+        } catch (\Throwable $e) {
+            error_log('[ProblemMetricsService] exercise log read failed ' . json_encode([
+                'access_id' => $accessId,
+                'team_no' => $teamNo,
+                'outline_id' => $outlineId,
+                'exercise_no' => $exerciseNo,
+                'theme_id' => $themeId,
+                'scenario_id' => $scenarioId,
+                'error' => $e->getMessage(),
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+            throw $e;
+        }
 
         $exerciseStartEpoch = $this->getExerciseStartEpoch($log);
 
-        $workflow = $this->workflowRepo->findWorkflowData(
-            $accessId,
-            $teamValues,
-            $teamNo,
-            $colTeam,
-            $outlineId,
-            $exerciseNo,
-            $themeId,
-            $scenarioId
-        );
+        try {
+            $workflow = $this->workflowRepo->findWorkflowData(
+                $accessId,
+                $teamValues,
+                $teamNo,
+                $colTeam,
+                $outlineId,
+                $exerciseNo,
+                $themeId,
+                $scenarioId
+            );
+        } catch (\Throwable $e) {
+            error_log('[ProblemMetricsService] workflow read failed ' . json_encode([
+                'access_id' => $accessId,
+                'team_no' => $teamNo,
+                'col_team_no' => $colTeam,
+                'outline_id' => $outlineId,
+                'exercise_no' => $exerciseNo,
+                'theme_id' => $themeId,
+                'scenario_id' => $scenarioId,
+                'error' => $e->getMessage(),
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+            throw $e;
+        }
 
         if ($exerciseStartEpoch > 0) {
             array_unshift($workflow, [
@@ -193,6 +283,7 @@ final class ProblemMetricsService
                 'symptoms' => $refSymptoms,
                 'facts' => $refFacts,
                 'causes' => $refCauses,
+                'actions' => [],
             ],
             'workflow' => $workflow,
             'skill' => $skillId,
@@ -411,6 +502,135 @@ final class ProblemMetricsService
             'time_score' => $sc3pct,
             'cost' => $sc4pct,
             'capture' => $capturePct,
+        ];
+    }
+
+    /**
+     * Critical success factors (CSF) derived from metrics.
+     *
+     * @param array<int, array{id:int, value:int, data:mixed, note:string}> $metrics
+     * @return array<int, array<string,mixed>>
+     */
+    private function buildCriticalSuccessFactors(array $metrics): array
+    {
+        $getValue = function (int $id) use ($metrics): int {
+            foreach ($metrics as $row) {
+                if ((int)($row['id'] ?? 0) === $id) {
+                    return (int)($row['value'] ?? 0);
+                }
+            }
+            return 0;
+        };
+
+        $minutesSeconds = static function ($t): array {
+            $tInt = (int)round((float)$t);
+            $minutes = intdiv($tInt, 60) % 60;
+            $seconds = $tInt % 60;
+            return ['minutes' => $minutes, 'seconds' => $seconds];
+        };
+
+        $factArr = [1, 2, 3, 4, 5, 6, 7];
+        $factFactors = [26, 26, 20, 10, 4, 10, 4];
+        $factScore = 0;
+        foreach ($factArr as $idx => $metricId) {
+            $factScore += $getValue($metricId) * $factFactors[$idx];
+        }
+
+        $m13 = $getValue(13);
+        $m14 = $getValue(14);
+        $m15 = $getValue(15);
+
+        $m13ms = $minutesSeconds($m13);
+        $m14ms = $minutesSeconds($m14);
+        $m15ms = $minutesSeconds($m15);
+
+        $tmp = ($getValue(1) + $getValue(2)) * 50;
+
+        return [
+            [
+                'id' => 11,
+                'value' => $tmp,
+                'score_value' => $tmp,
+                'score_unit' => 'percent',
+            ],
+            [
+                'id' => 12,
+                'value' => $m13,
+                'score_value' => $m13,
+                'score_unit' => 'time',
+                'minutes' => $m13ms['minutes'],
+                'seconds' => $m13ms['seconds'],
+            ],
+            [
+                'id' => 21,
+                'value' => $factScore,
+                'score_value' => $factScore,
+                'score_unit' => 'percent',
+            ],
+            [
+                'id' => 22,
+                'value' => $m14,
+                'score_value' => $m14,
+                'score_unit' => 'time',
+                'minutes' => $m14ms['minutes'],
+                'seconds' => $m14ms['seconds'],
+            ],
+            [
+                'id' => 31,
+                'value' => $getValue(8),
+                'score_value' => $getValue(8),
+                'score_unit' => 'number',
+            ],
+            [
+                'id' => 32,
+                'value' => $getValue(16),
+                'score_value' => $getValue(16),
+                'score_unit' => 'number',
+            ],
+            [
+                'id' => 33,
+                'value' => $m15,
+                'score_value' => $m15,
+                'score_unit' => 'time',
+                'minutes' => $m15ms['minutes'],
+                'seconds' => $m15ms['seconds'],
+            ],
+            [
+                'id' => 34,
+                'value' => $getValue(23),
+                'score_value' => $getValue(23),
+                'score_unit' => 'number',
+            ],
+            [
+                'id' => 41,
+                'value' => $getValue(9),
+                'score_value' => $getValue(9),
+                'score_unit' => 'number',
+            ],
+            [
+                'id' => 42,
+                'value' => $getValue(10),
+                'score_value' => $getValue(10),
+                'score_unit' => 'number',
+            ],
+            [
+                'id' => 43,
+                'value' => $getValue(11),
+                'score_value' => $getValue(11),
+                'score_unit' => 'number',
+            ],
+            [
+                'id' => 44,
+                'value' => $getValue(12),
+                'score_value' => $getValue(12),
+                'score_unit' => 'number',
+            ],
+            [
+                'id' => 91,
+                'value' => $getValue(17),
+                'score_value' => $getValue(17),
+                'score_unit' => 'number',
+            ],
         ];
     }
 

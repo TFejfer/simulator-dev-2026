@@ -96,6 +96,51 @@ final class ExerciseRuntimeRepository
 	}
 
 	/**
+	 * Latest log_exercise row for a specific exercise_no in this access/team scope.
+	 *
+	 * @return array<string,mixed>|null
+	 */
+	public function findLatestByExerciseNo(int $accessId, int $teamNo, int $exerciseNo): ?array
+	{
+		if ($accessId <= 0 || $teamNo <= 0 || $exerciseNo <= 0) return null;
+
+		try {
+			$stmt = $this->dbRuntime->prepare("
+				SELECT
+					id,
+					created_at,
+					access_id,
+					team_no,
+					outline_id,
+					skill_id,
+					exercise_no,
+					theme_id,
+					scenario_id,
+					format_id,
+					step_no,
+					current_state,
+					next_state
+				FROM log_exercise
+				WHERE access_id = :access_id
+				  AND team_no = :team_no
+				  AND exercise_no = :exercise_no
+				ORDER BY id DESC
+				LIMIT 1
+			");
+			$stmt->execute([
+				':access_id' => $accessId,
+				':team_no' => $teamNo,
+				':exercise_no' => $exerciseNo,
+			]);
+
+			$row = $stmt->fetch(PDO::FETCH_ASSOC);
+			return is_array($row) ? $row : null;
+		} catch (Throwable) {
+			return null;
+		}
+	}
+
+	/**
 	 * Count actions logged for a specific outline in this access/team scope.
 	 */
 	public function getMaxActions(int $accessId, int $outlineId, int $teamNo): int

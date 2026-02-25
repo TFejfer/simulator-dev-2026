@@ -22,6 +22,7 @@
 		'training-instructor-problem-analysis': { term_id: 561 },
 		'training-instructor-problem-action': { term_id: 36 },
 		'training-instructor-problem-complete': { term_id: 395 },
+		'training-instructor-problem-result': { term_id: 107 },
 		'training-instructor-results': { term_id: 562 },
 		'training-instructor-result': { term_id: 107 },
 	});

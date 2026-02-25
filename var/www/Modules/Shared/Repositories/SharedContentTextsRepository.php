@@ -196,6 +196,27 @@ final class SharedContentTextsRepository
         );
     }
 
+    public function readProblemResultTermsRows(string $languageCode): array
+    {
+        return $this->readKeyTextRows(
+            masterTable: 'i18n_problem_result_terms_master',
+            transTable:  'i18n_problem_result_terms_translations',
+            languageCode: $languageCode,
+            extraMasterCols: [
+                'type_code',
+                'item_id',
+                'item_element',
+                'sequence_no',
+            ],
+            allowedMasterCols: [
+                'type_code',
+                'item_id',
+                'item_element',
+                'sequence_no',
+            ]
+        );
+    }
+
     // RISK SKILL CONTENT
     public function readRiskTermsRows(string $languageCode): array
     {

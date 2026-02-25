@@ -79,4 +79,49 @@ final class ProblemMetricsRepository
             ]);
         }
     }
+
+    /**
+     * Read persisted metrics for a completed exercise (by outline).
+     *
+     * @return array<int, array{id:int, value:int, data:mixed, note:string}>
+     */
+    public function readByOutline(int $accessId, int $teamNo, int $outlineId): array
+    {
+        if ($accessId <= 0 || $teamNo <= 0 || $outlineId <= 0) return [];
+
+        $stmt = $this->dbRuntime->prepare("
+            SELECT metric_id, value_int, data
+            FROM problem_metrics
+            WHERE access_id = :access_id
+              AND team_no = :team_no
+              AND outline_id = :outline_id
+            ORDER BY metric_id ASC
+        ");
+        $stmt->execute([
+            ':access_id' => $accessId,
+            ':team_no' => $teamNo,
+            ':outline_id' => $outlineId,
+        ]);
+
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $out = [];
+
+        foreach ($rows as $row) {
+            $data = null;
+            $raw = $row['data'] ?? null;
+            if (is_string($raw) && $raw !== '') {
+                $decoded = json_decode($raw, true);
+                $data = is_array($decoded) ? $decoded : null;
+            }
+
+            $out[] = [
+                'id' => (int)($row['metric_id'] ?? 0),
+                'value' => (int)($row['value_int'] ?? 0),
+                'data' => $data,
+                'note' => '',
+            ];
+        }
+
+        return $out;
+    }
 }

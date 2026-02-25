@@ -22,7 +22,7 @@
 		// - training-risk-instructor-result
 		// - training-rca-instructor-result
 		const k = pageKey(ctx);
-		return /-instructor-result$/.test(k) && k.startsWith('training-');
+		return (/(-instructor-result|-problem-result)$/.test(k) && k.startsWith('training-'));
 	};
 
 	const shouldRenderCourse = (ctx) => isCourseOutline(ctx);

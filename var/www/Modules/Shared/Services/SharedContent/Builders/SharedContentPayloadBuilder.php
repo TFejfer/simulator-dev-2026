@@ -88,6 +88,7 @@ final class SharedContentPayloadBuilder implements PayloadBuilderInterface
             'ci_actions' => $this->repo->rowsToMap(
                 $this->repo->readCiActionsRows($lang)
             ),
+            'problem_result_terms' => $this->repo->readProblemResultTermsRows($lang),
             
             // RISK SKILL CONTENT
             'risk_terms' => $this->repo->rowsToMap(
