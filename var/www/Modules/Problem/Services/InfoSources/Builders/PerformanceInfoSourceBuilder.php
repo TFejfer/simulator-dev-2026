@@ -25,8 +25,12 @@ final class PerformanceInfoSourceBuilder
      */
     public function build(InfoSourceKey $k): array
     {
-        $should = $this->repo->readPerformanceShouldVideoId($k->themeId);
-        $actual = $this->repo->readPerformanceActualVideoId($k->themeId, $k->scenarioId, $k->state);
+        $vis = $this->repo->readScenarioVisibilityMap($k->themeId, $k->scenarioId, ['pes', 'pea']);
+        $pesVisible = (int)($vis['pes'] ?? 0) >= 1;
+        $peaVisible = (int)($vis['pea'] ?? 0) >= 1;
+
+        $should = $pesVisible ? $this->repo->readPerformanceShouldVideoId($k->themeId) : 0;
+        $actual = $peaVisible ? $this->repo->readPerformanceActualVideoId($k->themeId, $k->scenarioId, $k->state) : 0;
 
         return [
             'pes_video_id' => $should,

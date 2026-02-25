@@ -44,6 +44,38 @@
 	const term = (id, fallback = '') =>
 		(typeof window.simulatorTerm === 'function' ? window.simulatorTerm(id, 'common', fallback) : fallback);
 
+	const ensureVisibility = (ctx) => {
+		if (window.SIM_VISIBILITY?.problem) return window.SIM_VISIBILITY.problem;
+		if (window.__PROBLEM_VIS_REQUESTED__ || !window.simulatorAjaxRequest) return null;
+
+		const ex = ctx?.exercise || {};
+		const body = {
+			format_id: Number(ex.format_id || ex.formatId || ex.format_no || ex.format || 0),
+			step_no: Number(ex.step_no || ex.stepNo || ex.step || 0),
+			position_count: Number(ex.position_count || ex.positionCount || ex.positions || 0),
+			role_id: Number(ex.role_id || ex.roleId || ex.role || 0),
+			theme_id: Number(ex.theme_id || ex.themeId || ex.theme || 0),
+			scenario_id: Number(ex.scenario_id || ex.scenarioId || ex.scenario || 0)
+		};
+
+		window.__PROBLEM_VIS_REQUESTED__ = true;
+		window.simulatorAjaxRequest(
+			'/ajax/problem_menu_visibility_read.php',
+			'POST',
+			body,
+			{ mode: 'dynamic', timeoutMs: 15000 }
+		).then((res) => {
+			if (!res?.ok || !res.data || typeof res.data !== 'object') return;
+			window.SIM_VISIBILITY = window.SIM_VISIBILITY || {};
+			window.SIM_VISIBILITY.problem = res.data;
+			if (window.ProblemInfoSidebar?.prepare) {
+				try { window.ProblemInfoSidebar.prepare(); } catch {}
+			}
+		}).catch(() => {});
+
+		return null;
+	};
+
 	/* =========================
 	 * Debug helpers (?debug)
 	 * ========================= */
@@ -171,8 +203,12 @@
 	const render = (ctx, source) => {
 		const title = getMenuButtonLabel(window.SIM_SHARED?.menu_buttons || [], 'log', 'System log');
 		const step = Number(ctx?.exercise?.step_no || 0);
-		const slsRows = buildRows('sls', source?.sls || source?.should);
-		const rawSlaRows = buildRows('sla', source?.sla || source?.actual);
+		const vis = ensureVisibility(ctx) || window.SIM_VISIBILITY?.problem || null;
+		const slsAllowed = (vis?.sls ?? 1) > 0;
+		const slaAllowed = (vis?.sla ?? 1) > 0;
+
+		const slsRows = slsAllowed ? buildRows('sls', source?.sls || source?.should) : '';
+		const rawSlaRows = slaAllowed ? buildRows('sla', source?.sla || source?.actual) : '';
 		const slaRows = step === 80 && slsRows ? slsRows : rawSlaRows;
 		const hasContent = Boolean(slsRows || slaRows);
 

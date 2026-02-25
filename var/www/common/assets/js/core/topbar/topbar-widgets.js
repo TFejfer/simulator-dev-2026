@@ -63,7 +63,7 @@
 				? window.PageTitleResolver.resolve(ctx)
 				: '';
 			if (!title) return '';
-			return `<div><div class="capitalize-all">${safe(title)}</div></div>`;
+			return `<div><div class="topbar-content capitalize-all">${safe(title)}</div></div>`;
 		},
 
 		rolePositions: (ctx) => {

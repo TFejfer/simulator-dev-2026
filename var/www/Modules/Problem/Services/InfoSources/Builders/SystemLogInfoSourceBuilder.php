@@ -31,12 +31,16 @@ final class SystemLogInfoSourceBuilder
 
     public function build(InfoSourceKey $k): array
     {
+        $vis = $this->repo->readScenarioVisibilityMap($k->themeId, $k->scenarioId, ['sls', 'sla']);
+        $slsVisible = (int)($vis['sls'] ?? 0) >= 1;
+        $slaVisible = (int)($vis['sla'] ?? 0) >= 1;
+
         // ------------------------------------------------------------
         // 1) SLS ("should") always: systemlog__sls<theme>
         // ------------------------------------------------------------
         $slsTable   = sprintf('systemlog__sls%02d', $k->themeId);
-        $slsRowsRaw = $this->repo->readSystemLogParsedRows($slsTable);
-        $sls        = $this->formatRows($slsRowsRaw, $k->languageCode);
+        $slsRowsRaw = $slsVisible ? $this->repo->readSystemLogParsedRows($slsTable) : [];
+        $sls        = $slsVisible ? $this->formatRows($slsRowsRaw, $k->languageCode) : [];
 
         // ------------------------------------------------------------
         // 2) SLA ("actual") table is scenario/state specific.
@@ -48,7 +52,7 @@ final class SystemLogInfoSourceBuilder
         $slaTable = sprintf('systemlog__sla%02d%02d%02d', $k->themeId, $effScenario, $effState);
         $sla      = [];
 
-        if ($this->repo->contentTableExists($slaTable)) {
+        if ($slaVisible && $this->repo->contentTableExists($slaTable)) {
             $slaRowsRaw = $this->repo->readSystemLogParsedRows($slaTable);
             $sla        = $this->formatRows($slaRowsRaw, $k->languageCode);
         }

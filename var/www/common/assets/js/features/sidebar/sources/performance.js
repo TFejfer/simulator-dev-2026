@@ -43,6 +43,38 @@
 		typeof window.simulatorTerm === 'function' ? window.simulatorTerm(id, 'common', fallback) : fallback
 	);
 
+	const ensureVisibility = (ctx) => {
+		if (window.SIM_VISIBILITY?.problem) return window.SIM_VISIBILITY.problem;
+		if (window.__PROBLEM_VIS_REQUESTED__ || !window.simulatorAjaxRequest) return null;
+
+		const ex = ctx?.exercise || {};
+		const body = {
+			format_id: Number(ex.format_id || ex.formatId || ex.format_no || ex.format || 0),
+			step_no: Number(ex.step_no || ex.stepNo || ex.step || 0),
+			position_count: Number(ex.position_count || ex.positionCount || ex.positions || 0),
+			role_id: Number(ex.role_id || ex.roleId || ex.role || 0),
+			theme_id: Number(ex.theme_id || ex.themeId || ex.theme || 0),
+			scenario_id: Number(ex.scenario_id || ex.scenarioId || ex.scenario || 0)
+		};
+
+		window.__PROBLEM_VIS_REQUESTED__ = true;
+		window.simulatorAjaxRequest(
+			'/ajax/problem_menu_visibility_read.php',
+			'POST',
+			body,
+			{ mode: 'dynamic', timeoutMs: 15000 }
+		).then((res) => {
+			if (!res?.ok || !res.data || typeof res.data !== 'object') return;
+			window.SIM_VISIBILITY = window.SIM_VISIBILITY || {};
+			window.SIM_VISIBILITY.problem = res.data;
+			if (window.ProblemInfoSidebar?.prepare) {
+				try { window.ProblemInfoSidebar.prepare(); } catch {}
+			}
+		}).catch(() => {});
+
+		return null;
+	};
+
 	/* =========================
 	 * Debug helpers (?debug)
 	 * ========================= */
@@ -88,7 +120,7 @@
 	`;
 
 	const buildVideo = (code, videoId, lang) => {
-		if (!videoId) return '';
+		if (!videoId) return `<p>${esc(term(25, 'Intentionally not available'))}</p>`;
 		if (window.SimVideo?.buildVideoHtml) {
 			return window.SimVideo.buildVideoHtml(code, videoId, lang, false);
 		}
@@ -98,14 +130,18 @@
 	const render = (ctx, source) => {
 		const title = getMenuButtonLabel(window.SIM_SHARED?.menu_buttons || [], 'per', 'Performance');
 		const hasContent = source && typeof source === 'object' && Object.keys(source).length;
+		const vis = ensureVisibility(ctx) || window.SIM_VISIBILITY?.problem || null;
 		dbg('render:start', { hasContent, hasPes: !!source?.pes_video_id, hasPea: !!(source?.pea_video_id_actual || source?.pea_video_id) });
 		if (!hasContent) return renderEmpty(title);
 
 		const lang = ctx?.delivery?.language_code || ctx?.delivery?.languageCode || 'en';
 		const step = Number(ctx?.exercise?.step_no || ctx?.exercise?.step || ctx?.exercise?.current_step || 0);
 
-		const pesId = source.pes_video_id || '';
-		let peaId = source.pea_video_id_actual || source.pea_video_id || '';
+		const pesAllowed = (vis?.pes ?? 1) > 0;
+		const peaAllowed = (vis?.pea ?? 1) > 0;
+
+		const pesId = pesAllowed ? (source.pes_video_id || '') : '';
+		let peaId = peaAllowed ? (source.pea_video_id_actual || source.pea_video_id || '') : '';
 		if (step === 80 && pesId) {
 			peaId = pesId;
 		}
@@ -113,8 +149,8 @@
 		const pesVisible = !!pesId;
 		const peaVisible = !!peaId;
 
-		const pesHtml = pesVisible ? buildVideo('pes', pesId, lang) : `<p>${esc(term(25, 'Not available'))}</p>`;
-		const peaHtml = peaVisible ? buildVideo('pea', peaId, lang) : `<p>${esc(term(25, 'Not available'))}</p>`;
+		const pesHtml = buildVideo('pes', pesId, lang);
+		const peaHtml = buildVideo('pea', peaId, lang);
 
 		return `
 			<div class="simulator-info-source" data-code="per">

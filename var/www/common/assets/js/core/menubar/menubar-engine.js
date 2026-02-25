@@ -15,6 +15,55 @@
 
 	const $ = window.jQuery;
 
+	const readBadgeKeyParts = (ctx) => {
+		const delivery = ctx?.delivery || {};
+		const exercise = ctx?.exercise || {};
+		const accessId = Number(delivery.access_id || delivery.accessId || 0);
+		const outlineId = Number(exercise.outline_id || exercise.outlineId || 0);
+		const stepNo = Number(exercise.step_no || exercise.stepNo || exercise.step || 0);
+		if (!accessId || !outlineId || !stepNo) return null;
+		return { accessId, outlineId, stepNo };
+	};
+
+	const inboxBadgeKey = (ctx) => {
+		const parts = readBadgeKeyParts(ctx);
+		if (!parts) return '';
+		return `badge:dismissed:inb:${parts.accessId}:${parts.outlineId}:${parts.stepNo}`;
+	};
+
+	const isInboxBadgeDismissed = (ctx) => {
+		const key = inboxBadgeKey(ctx);
+		if (!key) return false;
+		try {
+			return window.localStorage?.getItem(key) === '1';
+		} catch {
+			return false;
+		}
+	};
+
+	const dismissInboxBadge = (ctx) => {
+		const key = inboxBadgeKey(ctx);
+		if (!key) return;
+		try {
+			window.localStorage?.setItem(key, '1');
+		} catch {}
+
+		const badgeEl = document.getElementById('badge_inb');
+		if (badgeEl) badgeEl.classList.remove('button-badge');
+
+		if (window.SIM_VISIBILITY?.problem && Number(window.SIM_VISIBILITY.problem.inb || 0) === 2) {
+			window.SIM_VISIBILITY.problem.inb = 1;
+		}
+	};
+
+	const applyInboxBadgeOverride = (visibilityMap, ctx) => {
+		if (!visibilityMap || typeof visibilityMap !== 'object') return visibilityMap;
+		if (Number(visibilityMap.inb || 0) !== 2) return visibilityMap;
+		if (!isInboxBadgeDismissed(ctx)) return visibilityMap;
+		visibilityMap.inb = 1;
+		return visibilityMap;
+	};
+
 	const readPageData = () => {
 		const el = document.getElementById('page-data');
 		if (!el) return null;
@@ -126,6 +175,14 @@
 			// For now: focus on Problem (skill_id=1)
 			if (showExercise && skillId === 1) {
 				visibilityMap = await fetchProblemVisibility(ctx);
+				visibilityMap = applyInboxBadgeOverride(visibilityMap, ctx);
+				if (visibilityMap) {
+					window.SIM_VISIBILITY = window.SIM_VISIBILITY || {};
+					window.SIM_VISIBILITY.problem = visibilityMap;
+					if (window.ProblemInfoSidebar?.prepare) {
+						try { window.ProblemInfoSidebar.prepare(); } catch {}
+					}
+				}
 			}
 
 			// Render course buttons
@@ -161,4 +218,9 @@
 	};
 
 	window.MenuBarEngine = Object.freeze(MenuBarEngine);
+	window.MenuBarBadge = Object.freeze({
+		dismissInbox: dismissInboxBadge,
+		isInboxDismissed: isInboxBadgeDismissed,
+		applyInboxOverride: applyInboxBadgeOverride
+	});
 })();

@@ -25,8 +25,13 @@
 			if (!el) return fallback;
 			try {
 				const parsed = JSON.parse(el.textContent || '{}');
+				const delivery = Object.assign(
+					{},
+					parsed?.DATA?.DELIVERY_META || {},
+					parsed?.DATA?.DELIVERY || {}
+				);
 				cache = {
-					delivery: parsed?.DATA?.DELIVERY_META || parsed?.DATA?.DELIVERY || {},
+					delivery,
 					exercise: parsed?.DATA?.EXERCISE_META || parsed?.DATA?.EXERCISE || {},
 					pageKey: parsed?.CTX_KEY || ''
 				};
@@ -164,6 +169,10 @@
 
 		if (!prepared) prepare();
 		if (!mounted) mountAll();
+
+		if (def.code === 'inb') {
+			try { window.MenuBarBadge?.dismissInbox?.(readPageData()); } catch {}
+		}
 
 		const $body = utils.ensureSidebarBody();
 		if (!$body || !$body.length) return false;

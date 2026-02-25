@@ -183,6 +183,34 @@ final class ProblemInfoSourceRepository
        - Prefer requested language; fallback to EN.
        ============================================================ */
 
+    public function readScenarioVisibilityMap(int $themeId, int $scenarioId, array $codes): array
+    {
+        $codes = array_values(array_unique(array_filter(array_map('strval', $codes), static fn($c) => $c !== '')));
+        if ($themeId <= 0 || $scenarioId <= 0 || !$codes) return [];
+
+        $placeholders = implode(',', array_fill(0, count($codes), '?'));
+
+        $stmt = $this->dbProblemContent->prepare(
+            "SELECT source_code, is_visible
+             FROM problem_visibility_info_sources_scenario
+             WHERE theme_id = ?
+               AND scenario_id = ?
+               AND source_code IN ($placeholders)"
+        );
+
+        $stmt->execute(array_merge([$themeId, $scenarioId], $codes));
+
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $map = [];
+        foreach ($rows as $r) {
+            $code = (string)($r['source_code'] ?? '');
+            if ($code === '') continue;
+            $map[$code] = (int)($r['is_visible'] ?? 0);
+        }
+
+        return $map;
+    }
+
     public function readProcessVideoId(int $themeId, string $languageCode): int
     {
         $val = $this->fetchOneInt("
