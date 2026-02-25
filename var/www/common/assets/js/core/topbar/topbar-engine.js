@@ -245,21 +245,21 @@
 
 		const mode = String(layout?.timer?.mode || 'none');
 
-		if (mode !== lastTimerMode) {
-			lastTimerMode = mode;
-			if (window.TopBarTimer) window.TopBarTimer.start(mode, ctx);
-		} else {
-			if (overrides && overrides._forceTimerRestart && window.TopBarTimer) {
-				window.TopBarTimer.start(mode, ctx);
-			}
-		}
-
 		if (window.TopBarTimer?.setTickHandler) {
 			if (mode === 'countdown') {
 				window.TopBarTimer.setTickHandler(countdownTickHandler(ctx));
 			} else {
 				window.TopBarTimer.setTickHandler(null);
 				clearTimerColors();
+			}
+		}
+
+		if (mode !== lastTimerMode) {
+			lastTimerMode = mode;
+			if (window.TopBarTimer) window.TopBarTimer.start(mode, ctx);
+		} else {
+			if (overrides && overrides._forceTimerRestart && window.TopBarTimer) {
+				window.TopBarTimer.start(mode, ctx);
 			}
 		}
 

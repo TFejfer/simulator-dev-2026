@@ -103,6 +103,90 @@ $timerInput = [
 $timerEndUnix = (int)$timerInput['timer_end_unix'];
 $timerPhase = (string)$timerInput['phase'];
 
+// If finalize timer already expired on load, advance server-side and redirect.
+$isFinalizeStep = (int)($exerciseMetaArr['step_no'] ?? 0) >= 80;
+$isExpired = ($deadlineUnix > 0 && $deadlineUnix <= $serverNow)
+	|| ($deadlineUnix <= 0 && $secondsLeft <= 0);
+
+if ($isFinalizeStep && $isExpired) {
+	if (isset($exerciseRuntimeRepo, $exerciseStepsRepo)
+		&& $exerciseRuntimeRepo instanceof \Modules\Training\Auth\Repositories\ExerciseRuntimeRepository
+		&& $exerciseStepsRepo instanceof \Modules\Training\Auth\Repositories\ExerciseStepsRepository
+	) {
+		$skillId = (int)($exerciseMetaArr['skill_id'] ?? 0);
+		$formatId = (int)($exerciseMetaArr['format_id'] ?? 0);
+		$outlineId = (int)($exerciseMetaArr['outline_id'] ?? 0);
+		$exerciseNo = (int)($exerciseMetaArr['exercise_no'] ?? 0);
+		$themeId = (int)($exerciseMetaArr['theme_id'] ?? 0);
+		$scenarioId = (int)($exerciseMetaArr['scenario_id'] ?? 0);
+		$stepNo = (int)($exerciseMetaArr['step_no'] ?? 0);
+		$currentState = (int)($exerciseMetaArr['current_state'] ?? 0);
+
+		$futureSteps = $exerciseStepsRepo->findFutureSteps($skillId, $formatId, $stepNo);
+		$nextStepRow = $futureSteps[0] ?? null;
+
+		if (!is_array($nextStepRow)) {
+			error_log('[training-problem-instructor-analysis] finalize-timeout missing next step ' . json_encode([
+				'access_id' => $accessId,
+				'team_no' => $teamNo,
+				'outline_id' => $outlineId,
+				'skill_id' => $skillId,
+				'format_id' => $formatId,
+				'step_no' => $stepNo,
+				'deadline_unix' => $deadlineUnix,
+				'seconds_left' => $secondsLeft,
+			], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+		}
+
+		if (is_array($nextStepRow)) {
+			$nextStepNo = (int)($nextStepRow['step_no'] ?? 0);
+			$pageKey = (string)($nextStepRow['page_key'] ?? '');
+
+			if ($nextStepNo > 0 && $pageKey !== '') {
+				$exerciseRuntimeRepo->insertNextStepIfNotExists([
+					'access_id' => $accessId,
+					'team_no' => $teamNo,
+					'outline_id' => $outlineId,
+					'skill_id' => $skillId,
+					'exercise_no' => $exerciseNo,
+					'theme_id' => $themeId,
+					'scenario_id' => $scenarioId,
+					'format_id' => $formatId,
+					'step_no' => $nextStepNo,
+					'current_state' => $nextStepRow['current_state'] === null ? $currentState : $nextStepRow['current_state'],
+					'next_state' => $nextStepRow['next_state'] === null ? $currentState : $nextStepRow['next_state'],
+					'actor_token' => $sessionToken,
+					'actor_name' => 'participant',
+					'include_in_poll' => 1,
+				]);
+
+				$latest = $exerciseRuntimeRepo->findLatestRow($accessId, $teamNo);
+				$latestStep = (int)($latest['step_no'] ?? 0);
+				if ($latestStep >= $nextStepNo) {
+					if ($latestStep > $nextStepNo) {
+						$latestRow = $exerciseStepsRepo->findStepRow($skillId, $formatId, $latestStep);
+						if (is_array($latestRow) && !empty($latestRow['page_key'])) {
+							$pageKey = (string)$latestRow['page_key'];
+						}
+					}
+
+					header('Location: ' . $pageKey);
+					exit;
+				}
+
+				error_log('[training-problem-instructor-analysis] finalize-timeout insert failed ' . json_encode([
+					'access_id' => $accessId,
+					'team_no' => $teamNo,
+					'outline_id' => $outlineId,
+					'step_no' => $stepNo,
+					'next_step_no' => $nextStepNo,
+					'latest_step' => $latestStep,
+				], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+			}
+		}
+	}
+}
+
 // Release session lock early (critical for parallel AJAX)
 session_write_close();
 

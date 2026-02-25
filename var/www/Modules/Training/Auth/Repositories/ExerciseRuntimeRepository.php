@@ -204,6 +204,61 @@ final class ExerciseRuntimeRepository
 	}
 
 	/**
+	 * Returns completed exercises (step_no=100) for this access/team scope.
+	 *
+	 * @return array<int, array{exercise_no:int, skill_id:int, theme_id:int, scenario_id:int, format_id:int, step_no:int}>
+	 */
+	public function findCompletedExercises(int $accessId, int $teamNo): array
+	{
+		if ($accessId <= 0 || $teamNo <= 0) return [];
+
+		try {
+			$stmt = $this->dbRuntime->prepare("
+				SELECT
+					le.exercise_no,
+					le.skill_id,
+					le.theme_id,
+					le.scenario_id,
+					le.format_id,
+					le.step_no
+				FROM log_exercise le
+				INNER JOIN (
+					SELECT exercise_no, MAX(id) AS max_id
+					FROM log_exercise
+					WHERE access_id = :access_id_inner
+					  AND team_no   = :team_no_inner
+					  AND step_no   = 100
+					GROUP BY exercise_no
+				) x
+				  ON x.max_id = le.id
+				ORDER BY le.exercise_no ASC
+			");
+			$stmt->execute([
+				':access_id_inner' => $accessId,
+				':team_no_inner' => $teamNo,
+			]);
+
+			$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+			$out = [];
+			foreach ($rows as $r) {
+				$out[] = [
+					'exercise_no' => (int)($r['exercise_no'] ?? 0),
+					'skill_id' => (int)($r['skill_id'] ?? 0),
+					'theme_id' => (int)($r['theme_id'] ?? 0),
+					'scenario_id' => (int)($r['scenario_id'] ?? 0),
+					'format_id' => (int)($r['format_id'] ?? 0),
+					'step_no' => (int)($r['step_no'] ?? 0),
+				];
+			}
+			return $out;
+
+		} catch (Throwable) {
+			return [];
+		}
+	}
+
+	/**
 	 * Unlock model:
 	 * - unlocked if a log_exercise_unlock row exists within the last $windowSeconds.
 	 */
@@ -488,7 +543,7 @@ final class ExerciseRuntimeRepository
 			$id = (int)$this->dbRuntime->lastInsertId();
 			return $id > 0 ? $id : null;
 		} catch (Throwable $e) {
-			// Log gerne $e->getMessage() i din egen error logger
+			error_log('[ExerciseRuntimeRepository] insertNextStepIfNotExists failed: ' . $e->getMessage());
 			return null;
 		}
 	}
