@@ -29,7 +29,7 @@ final class ProblemResultPage extends BasePage
 			'top' => [
 				'topbar' => [
 					'home_html' => '<i class="fa-regular fa-house"></i>',
-					'show_logout' => true,
+					'show_logout' => false,
 				],
 			],
 			'chrome' => [

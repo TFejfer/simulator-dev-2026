@@ -60,7 +60,7 @@
 
 			switch (code) {
 				case 'res':
-					window.location.href = 'training-instructor-results';
+					window.location.href = 'training-instructor-outline';
 					break;
 
 				case 'set':

@@ -137,7 +137,7 @@ try {
 
 	// Completed -> go to result page
 	if ($isCompleted) {
-		$target = ((int)$skillId === 1) ? 'training-problem-instructor-result' : 'training-instructor-results';
+		$target = ((int)$skillId === 1) ? 'training-problem-instructor-result' : 'training-instructor-outline';
 		echo json_encode([
 			'ok' => true,
 			'data' => [

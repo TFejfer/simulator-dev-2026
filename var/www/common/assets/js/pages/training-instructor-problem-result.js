@@ -1744,7 +1744,7 @@
 
 			$('#topBar').off('click.resultHome', '#topBarHome');
 			$('#topBar').on('click.resultHome', '#topBarHome', function () {
-				window.location.href = 'training-instructor-results';
+				window.location.href = 'training-instructor-outline';
 			});
 		},
 

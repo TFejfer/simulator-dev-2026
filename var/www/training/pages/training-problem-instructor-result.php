@@ -31,7 +31,7 @@ if ($exerciseNo <= 0) {
 }
 
 if ($exerciseNo <= 0) {
-	header('Location: /training-instructor-results');
+	header('Location: /training-instructor-outline');
 	exit;
 }
 
@@ -40,7 +40,7 @@ $teamNo = (int)($deliveryMeta['team_no'] ?? 0);
 $languageCode = (string)($deliveryMeta['language_code'] ?? 'en');
 
 if ($accessId <= 0 || $teamNo <= 0) {
-	header('Location: /training-instructor-results');
+	header('Location: /training-instructor-outline');
 	exit;
 }
 
@@ -54,7 +54,7 @@ try {
 		'exercise_no' => $exerciseNo,
 		'error' => $e->getMessage(),
 	], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-	header('Location: /training-instructor-results');
+	header('Location: /training-instructor-outline');
 	exit;
 }
 
@@ -66,7 +66,7 @@ $themeId = (int)($exerciseMetaArr['theme_id'] ?? 0);
 $scenarioId = (int)($exerciseMetaArr['scenario_id'] ?? 0);
 
 if ($stepNo !== 100 || $skillId !== 1 || $outlineId <= 0) {
-	header('Location: /training-instructor-results');
+	header('Location: /training-instructor-outline');
 	exit;
 }
 

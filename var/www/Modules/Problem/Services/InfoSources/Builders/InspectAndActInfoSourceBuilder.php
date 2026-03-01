@@ -36,31 +36,18 @@ final class InspectAndActInfoSourceBuilder
                 : (int)$k->state;
         }
 
-        // 3) Folder name (actionTTSSAA) - 2-digit padded
-        $webrotateXmlFolder = sprintf(
-            'action%02d%02d%02d',
-            (int)$k->themeId,
-            $effScenario,
-            $effState
-        );
-
-        // 4) File name = folder + language code (NO underscore)
-        $webrotateXmlFileName = $webrotateXmlFolder . (string)$k->languageCode;
-
-        // 5) Cabling map (theme-specific)
+        // Cabling map (theme-specific)
         $rows = $this->repo->readCablingMapRows([
             ':theme_id' => $k->themeId,
         ]);
 
-        // 6) CI descriptions
+        // CI descriptions
         $ciDescriptions = $this->repo->readCiDescriptionTexts($k->themeId, $k->languageCode);
 
-        // 7) CI action benefits
+        // CI action benefits
         $ciActionBenefits = $this->repo->readCiActionBenefitTexts($k->themeId, $k->languageCode);
 
         return [
-            'webrotateXmlFolder'   => $webrotateXmlFolder,
-            'webrotateXmlFileName' => $webrotateXmlFileName,
             'cabling_map' => array_map(static fn(array $r) => [
                 'cu_ci_id'        => (string)$r['cu_ci_id'],
                 'port_code'       => (string)$r['port_code'],

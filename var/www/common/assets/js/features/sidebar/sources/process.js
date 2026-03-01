@@ -28,6 +28,17 @@
 
 	const { getMenuButtonLabel } = window.ProblemInfoSourceUtils;
 
+	const esc = (s) => String(s ?? '')
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#039;');
+
+	const term = (id, fallback = '') => (
+		typeof window.simulatorTerm === 'function' ? window.simulatorTerm(id, 'common', fallback) : fallback
+	);
+
 	/* =========================
 	 * Debug helpers (?debug)
 	 * ========================= */
@@ -96,7 +107,6 @@
 		if (diagram) body += `
 			<div class="process-diagram">
 				<img src="${diagram}" alt="Process diagram" alt="" class="size-full process-diagram-img" />
-				<p><a href="${diagram}" target="_blank">View process diagram</a></p>
 			</div>
 		`;
 		if (!body) body = '<p style="opacity:0.7">No process assets found.</p>';
@@ -104,9 +114,24 @@
 		return `
 			<div class="simulator-info-source" data-code="pro">
 				<div class="sidebar-title">${title}</div>
+				<div class="reload-text">
+					${esc(term(129, ''))} <span class="reload link-text">${esc(term(128, ''))}</span>
+				</div>
 				${body}
 			</div>
 		`;
+	};
+
+	const bind = ($root) => {
+		const $ = window.jQuery;
+		dbg('bind:start', { hasJquery: !!$ });
+		if (!$) return;
+
+		// Reload link
+		$root.off('click.perfReload', '.reload').on('click.perfReload', '.reload', (e) => {
+			e.preventDefault();
+			window.location.reload();
+		});
 	};
 
 	window.ProblemInfoSources.register({
@@ -114,6 +139,7 @@
 		aliases: ['process'],
 		kind: 'static',
 		sourceKey: 'process',
-		render
+		render,
+		bind
 	});
 })();

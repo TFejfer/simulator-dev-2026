@@ -216,8 +216,9 @@ if (!empty($libScriptArr['chart'])) {
 
 // Image rotator
 if (!empty($libScriptArr['imagerotator'])) {
-    echo $css('/common/assets/webrotate/imagerotator/html/css/round.css');
-    echo $js('/common/assets/webrotate/imagerotator/html/js/imagerotator.js', true, $nonce);
+    // Loaded lazily by the feature(s) that need it.
+    //echo $js('/common/assets/js/modules/sim360-bus.js', true, $nonce);
+    //echo $js('/common/assets/js/modules/rotator360.js', true, $nonce);
 }
 
 // Flatpickr

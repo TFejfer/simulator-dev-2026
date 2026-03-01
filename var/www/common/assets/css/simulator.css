@@ -845,16 +845,6 @@ textarea.textarea-readonly {
     height: 100%;
 }
 
-/* Ensure sidebar shells have real height for offscreen prewarm */
-#sideBar,
-#sideBar .sidebar-container {
-	height: 100%;
-}
-
-#sideBar {
-	height: 100vh;
-}
-
 /* Allow rendered content that accidentally reuses the class to stay visible inside the active shell */
 .simulator-info-source .simulator-info-source {
 	position: static;
@@ -874,16 +864,6 @@ textarea.textarea-readonly {
 .simulator-info-source.active::after {
     content: ""; /* Remove unwanted content */
     display: none; /* Ensure the pseudo-element is hidden */
-}
-
-/* Keep WebRotate containers paintable even when offscreen */
-#sideBar .wr360_player_outer,
-#sideBar #wr360PlayerId,
-#sideBar .wr360_player {
-	width: 100%;
-	height: 70vh;
-	max-height: 640px;
-	min-height: 520px;
 }
 
 /* ================================================== */
